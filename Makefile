@@ -1,0 +1,28 @@
+
+CC      := gcc
+CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O3
+LDFLAGS :=
+LDLIBS  := -lm
+TARGET  := main
+OBJS    := build/main.o build/game.o
+
+.PHONY: all clean run
+
+all: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LDLIBS)
+
+build/%.o: src/%.c lib/game.h
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+clean:
+	rm -f $(OBJS) $(TARGET)
+	rm -f $(TARGET).zip
+
+bundle: clean
+	zip -r $(TARGET).zip Makefile src lib build
+
