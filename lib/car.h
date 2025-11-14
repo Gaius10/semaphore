@@ -2,8 +2,8 @@
 #define CAR_H
 
 typdef struct Car {
-    int position_x;
-    int position_y;
+    int pos_x;
+    int pos_y;
 } Car;
 
 Car* create_car(int x, int y);

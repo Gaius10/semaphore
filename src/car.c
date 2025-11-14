@@ -8,8 +8,8 @@ Car* create_car(int x, int y) {
         exit(1);
     }
 
-    car->position_x = x;
-    car->position_y = y;
+    car->pos_x = x;
+    car->pos_y = y;
 
     return car;
 }
@@ -19,7 +19,7 @@ void move_left(Car* car, int distance) {
         return;
     }
 
-    car->position_x -= distance;
+    car->pos_x -= distance;
 }
 
 void move_right(Car* car, int distance) {
@@ -27,7 +27,7 @@ void move_right(Car* car, int distance) {
         return;
     }
 
-    car->position_x += distance;
+    car->pos_x += distance;
 }
 
 void move_up(Car* car, int distance) {
@@ -35,7 +35,7 @@ void move_up(Car* car, int distance) {
         return;
     }
 
-    car->position_y += distance;
+    car->pos_y += distance;
 }
 
 void move_down(Car* car, int distance) {
@@ -43,7 +43,7 @@ void move_down(Car* car, int distance) {
         return;
     }
 
-    car->position_y -= distance;
+    car->pos_y -= distance;
 }
 
 void move_car(Car* car, int delta_x, int delta_y) {
@@ -51,8 +51,8 @@ void move_car(Car* car, int delta_x, int delta_y) {
         return;
     }
 
-    car->position_x += delta_x;
-    car->position_y += delta_y;
+    car->pos_x += delta_x;
+    car->pos_y += delta_y;
 }
 
 void destroy_car(Car* car) {
