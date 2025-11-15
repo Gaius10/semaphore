@@ -16,11 +16,11 @@ int main() {
     game_init(&game);
 
     pthread_create(&car_factory_thread, NULL, car_factory, &game);
-    // pthread_create(&car_mover_thread, NULL, car_mover, "Thread Argument 2");
-    pthread_create(&world_renderer_thread, NULL, world_renderer, &game);
+    pthread_create(&car_mover_thread, NULL, car_mover, &game);
+    pthread_create(&world_renderer_thread, NULL, world_renderer_debugger, &game);
 
     pthread_join(car_factory_thread, NULL);
-    // pthread_join(car_mover_thread, NULL);
+    pthread_join(car_mover_thread, NULL);
     pthread_join(world_renderer_thread, NULL);
     return 0;
 }

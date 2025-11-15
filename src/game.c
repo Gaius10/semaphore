@@ -14,8 +14,8 @@ void game_init(game_t* game) {
     sem_init(&game->road1_memmory, 0, 1);
     sem_init(&game->road2_memmory, 0, 1);
 
-    game->move_road1 = 0;
-    game->move_road2 = 0;
+    game->move_road1 = 1;
+    game->move_road2 = 1;
 }
 
 void* car_factory(void* arg) {
@@ -63,9 +63,37 @@ void* car_factory(void* arg) {
 }
 
 void* car_mover(void* arg) {
-    // @todo
-    printf("Car mover is running!\n");
-    printf("arg: %s\n", (char*)arg);
+    game_t* game = (game_t*)arg;
+
+    list_t *road1 = &game->road1; // horizontal
+    list_t *road2 = &game->road2; // vertical
+
+    car_t* car_buffer = NULL;
+
+    while (1) {
+        sem_wait(&game->road1_memmory);
+        sem_wait(&game->road2_memmory);
+
+        if (game->move_road1) {
+            for (uint8_t i = 0; i < road1->size; i++) {
+                car_buffer = (car_t*)list_get(road1, i);
+                car_buffer->pos_x += 1;
+            }
+        }
+
+        if (game->move_road2) {
+            for (uint8_t i = 0; i < road2->size; i++) {
+                car_buffer = (car_t*)list_get(road2, i);
+                car_buffer->pos_y += 1;
+            }
+        }
+
+        sem_post(&game->road1_memmory);
+        sem_post(&game->road2_memmory);
+
+        sleep(1);
+    }
+
     return NULL;
 }
 
@@ -85,12 +113,14 @@ void* world_renderer(void* arg) {
 
         for (int8_t i = 10; i >= -10; i--) {
             for (int8_t j = -10; j <= 10; j++) {
+                uint8_t drawn = 0;
 
                 // check road 1
                 for (uint8_t k = 0; k < road1->size; k++) {
                     car_buffer = (car_t*)list_get(road1, k);
                     if (car_buffer->pos_x == j && car_buffer->pos_y == i) {
                         printf(">");
+                        drawn = 1;
                         break;
                     }
                 }
@@ -100,11 +130,14 @@ void* world_renderer(void* arg) {
                     car_buffer = (car_t*)list_get(road2, k);
                     if (car_buffer->pos_x == j && car_buffer->pos_y == i) {
                         printf("^");
+                        drawn = 1;
                         break;
                     }
                 }
 
-                printf(" ");
+                if (!drawn) {
+                    printf(" ");
+                }
             }
 
             printf("\n");
@@ -132,6 +165,38 @@ void* world_renderer_debugger(void* arg) {
 
         sem_wait(&game->road1_memmory);
         sem_wait(&game->road2_memmory);
+
+        for (int8_t i = 10; i >= -10; i--) {
+            for (int8_t j = -10; j <= 10; j++) {
+                uint8_t drawn = 0;
+
+                // check road 1
+                for (uint8_t k = 0; k < road1->size; k++) {
+                    car_buffer = (car_t*)list_get(road1, k);
+                    if (car_buffer->pos_x == j && car_buffer->pos_y == i) {
+                        printf(">");
+                        drawn = 1;
+                        break;
+                    }
+                }
+
+                // check road 2
+                for (uint8_t k = 0; k < road2->size; k++) {
+                    car_buffer = (car_t*)list_get(road2, k);
+                    if (car_buffer->pos_x == j && car_buffer->pos_y == i) {
+                        printf("^");
+                        drawn = 1;
+                        break;
+                    }
+                }
+
+                if (!drawn) {
+                    printf(" ");
+                }
+            }
+
+            printf("\n");
+        }
 
         for (uint8_t i = 0; i < road1->size; i++) {
             car_buffer = (car_t*)list_get(road1, i);
