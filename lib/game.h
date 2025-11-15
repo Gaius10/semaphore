@@ -18,6 +18,8 @@ typedef struct game_t {
 
 void game_init(game_t* game);
 
+void* commander(void* arg);
+
 void* car_factory(void* arg);
 void* car_mover(void* arg);
 

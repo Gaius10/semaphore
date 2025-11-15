@@ -6,6 +6,7 @@
 
 #include "../lib/list.h"
 #include "../lib/game.h"
+#include "../lib/input.h"
 
 void game_init(game_t* game) {
     list_init(&game->road1); // horizontal
@@ -14,8 +15,31 @@ void game_init(game_t* game) {
     sem_init(&game->road1_memmory, 0, 1);
     sem_init(&game->road2_memmory, 0, 1);
 
-    game->move_road1 = 1;
-    game->move_road2 = 1;
+    game->move_road1 = 0;
+    game->move_road2 = 0;
+}
+
+void* commander(void* arg) {
+    game_t* game = (game_t*)arg;
+    char command;
+
+    while (1) {
+        command = getch();
+        switch (command) {
+            case 'h':
+            case 'H':
+                game->move_road1 = !game->move_road1;
+                break;
+            case 'v':
+            case 'V':
+                game->move_road2 = !game->move_road2;
+                break;
+            default:
+                break;
+        }
+    }
+
+    return NULL;
 }
 
 void* car_factory(void* arg) {
