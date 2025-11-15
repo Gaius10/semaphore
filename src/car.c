@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "../lib/car.h"
 
 Car* create_car(int x, int y) {

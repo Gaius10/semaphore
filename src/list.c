@@ -1,4 +1,8 @@
+#include <stdlib.h>
+#include <stdio.h>
+
 #include "../lib/list.h"
+#include "../lib/car.h"
 
 List* create_list() {
     List* list = (List*)malloc(sizeof(List));
@@ -37,7 +41,7 @@ void list_remove(List* list, int index) {
 
 void list_destroy(List* list) {
     for (int i = 0; i < list->size; i++) {
-        car_destroy(list->items[i]);
+        destroy_car(list->items[i]);
     }
 
     free(list);

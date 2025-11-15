@@ -1,7 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <time.h>
-#include "../lib/stack.h"
+#include "../lib/list.h"
 #include "../lib/game.h"
 
 void* car_factory(void* arg) {
@@ -10,8 +11,8 @@ void* car_factory(void* arg) {
     unsigned int random_number;
     srand(time(NULL));
 
-    List *road1 = ((GameArgs*)arg)->road1; // horizontal
-    List *road2 = ((GameArgs*)arg)->road2; // vertical
+    List *road1 = &((GameArgs*)arg)->road1; // horizontal
+    List *road2 = &((GameArgs*)arg)->road2; // vertical
 
     Car* car_buffer = NULL;
 
@@ -26,12 +27,12 @@ void* car_factory(void* arg) {
             case 1:
                 // push car to stack 1
                 car_buffer = create_car(-10, 0);
-                list_append(road1, car)
+                list_append(road1, car_buffer);
                 break;
             case 2:
                 // push car to stack 2
                 car_buffer = create_car(0, -10);
-                list_append(road2, car);
+                list_append(road2, car_buffer);
                 break;
         }
     }

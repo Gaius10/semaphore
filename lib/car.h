@@ -1,7 +1,7 @@
 #ifndef CAR_H
 #define CAR_H
 
-typdef struct Car {
+typedef struct Car {
     int pos_x;
     int pos_y;
 } Car;
