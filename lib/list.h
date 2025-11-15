@@ -5,16 +5,17 @@
 
 #define LIST_MAX_SIZE 100
 
-typedef struct List {
-    Car* items[LIST_MAX_SIZE];
+typedef struct list_t {
+    car_t* items[LIST_MAX_SIZE];
     int size;
-} List;
+} list_t;
 
-List* create_list();
-void list_append(List* list, Car* car);
-void list_remove(List* list, int index);
-void list_destroy(List* list);
+void list_init(list_t* list);
 
-Car* list_get(List* list, int index);
+void list_append(list_t* list, car_t* car);
+void list_remove(list_t* list, int index);
+void list_destroy(list_t* list);
+
+car_t* list_get(list_t* list, int index);
 
 #endif

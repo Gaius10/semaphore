@@ -6,35 +6,21 @@
 
 #include "../lib/game.h"
 
-sem_t semaphore;
-
-void* foo(void* arg) {
-    sem_wait(&semaphore);
-
-    sleep(1);
-    printf("Hello from thread!\n");
-    printf("arg: %s\n", (char*)arg);
-
-    sem_post(&semaphore);
-    return NULL;
-}
-
 int main() {
-    pthread_t thread1;
-    pthread_t thread2;
-    pthread_t thread3;
-    pthread_t thread4;
+    game_t game;
 
-    sem_init(&semaphore, 0, 1);
+    pthread_t car_factory_thread;
+    pthread_t car_mover_thread;
+    pthread_t world_renderer_thread;
 
-    pthread_create(&thread1, NULL, foo, "Thread Argument 1");
-    pthread_create(&thread2, NULL, foo, "Thread Argument 2");
-    pthread_create(&thread3, NULL, foo, "Thread Argument 3");
-    pthread_create(&thread4, NULL, foo, "Thread Argument 4");
+    game_init(&game);
 
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
-    pthread_join(thread3, NULL);
-    pthread_join(thread4, NULL);
+    pthread_create(&car_factory_thread, NULL, car_factory, &game);
+    // pthread_create(&car_mover_thread, NULL, car_mover, "Thread Argument 2");
+    pthread_create(&world_renderer_thread, NULL, world_renderer, &game);
+
+    pthread_join(car_factory_thread, NULL);
+    // pthread_join(car_mover_thread, NULL);
+    pthread_join(world_renderer_thread, NULL);
     return 0;
 }

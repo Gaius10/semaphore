@@ -4,29 +4,20 @@
 #include "../lib/list.h"
 #include "../lib/car.h"
 
-List* create_list() {
-    List* list = (List*)malloc(sizeof(List));
-
-    if (list == NULL) {
-        printf("Error allocating memory for List.\n");
-        printf("Exiting...\n");
-        exit(EXIT_FAILURE);
-    }
-
+void list_init(list_t* list) {
     list->size = 0;
-    return list;
 }
 
-void list_append(List* list, Car* car) {
+void list_append(list_t* list, car_t* car) {
     if (list->size >= LIST_MAX_SIZE) {
-        printf("List is full. Cannot append new car.\n");
+        printf("list_t is full. Cannot append new car.\n");
         return;
     }
 
     list->items[list->size++] = car;
 }
 
-void list_remove(List* list, int index) {
+void list_remove(list_t* list, int index) {
     if (index < 0 || index >= list->size) {
         printf("Index out of bounds. Cannot remove car.\n");
         return;
@@ -39,7 +30,7 @@ void list_remove(List* list, int index) {
     list->size--;
 }
 
-void list_destroy(List* list) {
+void list_destroy(list_t* list) {
     for (int i = 0; i < list->size; i++) {
         destroy_car(list->items[i]);
     }
@@ -47,7 +38,7 @@ void list_destroy(List* list) {
     free(list);
 }
 
-Car* list_get(List* list, int index) {
+car_t* list_get(list_t* list, int index) {
     if (index < 0 || index >= list->size) {
         printf("Index out of bounds. Cannot get car.\n");
         return NULL;

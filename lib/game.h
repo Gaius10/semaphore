@@ -7,14 +7,16 @@
 
 #include "list.h"
 
-typedef struct GameContext {
-    List road1;
-    List road2;
+typedef struct game_t {
+    list_t road1;
+    list_t road2;
     sem_t road1_memmory;
     sem_t road2_memmory;
     uint8_t move_road1;
     uint8_t move_road2;
-} GameContext;
+} game_t;
+
+void game_init(game_t* game);
 
 void* car_factory(void* arg);
 void* car_mover(void* arg);

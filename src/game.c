@@ -7,24 +7,36 @@
 #include "../lib/list.h"
 #include "../lib/game.h"
 
+void game_init(game_t* game) {
+    list_init(&game->road1); // horizontal
+    list_init(&game->road2); // vertical
+
+    sem_init(&game->road1_memmory, 0, 1);
+    sem_init(&game->road2_memmory, 0, 1);
+
+    game->move_road1 = 0;
+    game->move_road2 = 0;
+}
+
 void* car_factory(void* arg) {
     // @todo semaphores to control access to roads memmory
 
     unsigned int random_number;
     srand(time(NULL));
 
-    GameContext* game = (GameContext*)arg;
+    game_t* game = (game_t*)arg;
 
-    List *road1 = &game->road1; // horizontal
-    List *road2 = &game->road2; // vertical
+    list_t *road1 = &game->road1; // horizontal
+    list_t *road2 = &game->road2; // vertical
 
-    sem_wait(&game->road1_memmory);
-    sem_wait(&game->road2_memmory);
-
-    Car* car_buffer = NULL;
+    car_t* car_buffer = NULL;
 
     while (1) {
         sleep(1);
+
+        sem_wait(&game->road1_memmory);
+        sem_wait(&game->road2_memmory);
+
         random_number = rand() % 3;
 
         switch (random_number) {
@@ -42,10 +54,10 @@ void* car_factory(void* arg) {
                 list_append(road2, car_buffer);
                 break;
         }
-    }
 
-    sem_post(&game->road1_memmory);
-    sem_post(&game->road2_memmory);
+        sem_post(&game->road1_memmory);
+        sem_post(&game->road2_memmory);
+    }
 
     return NULL;
 }
@@ -58,8 +70,22 @@ void* car_mover(void* arg) {
 }
 
 void* world_renderer(void* arg) {
-    // @todo
-    printf("World renderer is running!\n");
-    printf("arg: %s\n", (char*)arg);
+    while (1) {
+        system("clear");
+
+        for (uint8_t i = 0; i < 40; i++) {
+            for (uint8_t j = 0; j < 40; j++) {
+                if (i == 19 || j == 19) {
+                    printf("+");
+                } else {
+                    printf(" ");
+                }
+            }
+            printf("\n");
+        }
+
+        sleep(1);
+    }
+
     return NULL;
 }
