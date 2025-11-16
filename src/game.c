@@ -88,20 +88,22 @@ void* car_factory(void* arg) {
 void* car_mover(void* arg) {
     game_t* game = (game_t*)arg;
 
-    list_t* roads[] = {&game->road1, &game->road2};
-    traffic_light_t* tls[] = {&game->traffic_light};
+    list_t* road1 = &game->road1; // horizontal
+    list_t* road2 = &game->road2; // vertical
 
     car_t* car_buffer = NULL;
+
+    traffic_light_t* tls[] = {&game->traffic_light};
 
     while (1) {
         sem_wait(&game->road1_memmory);
         sem_wait(&game->road2_memmory);
 
         // Process road 1
-        for (uint8_t i = 0; i < roads[0]->size; i++) {
-            car_buffer = (car_t*)list_get(roads[0], i);
+        for (uint8_t i = 0; i < road1->size; i++) {
+            car_buffer = (car_t*)list_get(road1, i);
 
-            if (some_car_at_position(roads, car_buffer->pos_x + 1, car_buffer->pos_y)) {
+            if (some_car_at_position(road1, car_buffer->pos_x + 1, car_buffer->pos_y)) {
                 continue;
             }
 
@@ -113,10 +115,10 @@ void* car_mover(void* arg) {
         }
 
         // Process road 2
-        for (uint8_t i = 0; i < roads[1]->size; i++) {
-            car_buffer = (car_t*)list_get(roads[1], i);
+        for (uint8_t i = 0; i < road2->size; i++) {
+            car_buffer = (car_t*)list_get(road2, i);
 
-            if (some_car_at_position(roads, car_buffer->pos_x, car_buffer->pos_y + 1)) {
+            if (some_car_at_position(road2, car_buffer->pos_x, car_buffer->pos_y + 1)) {
                 continue;
             }
 
@@ -181,6 +183,10 @@ void* world_renderer(void* arg) {
 
             printf("\n");
         }
+
+        printf("Traffic Light State - Horizontal: %s | Vertical: %s\n",
+               game->traffic_light.h_state == TL_GREEN ? "GREEN" : "RED",
+               game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED");
 
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);

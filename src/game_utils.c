@@ -5,16 +5,12 @@
 #define NUM_OF_ROADS 2
 #define NUM_OF_TRAFFIC_LIGHTS 1
 
-bool some_car_at_position(list_t* roads[], int8_t x, int8_t y) {
-    for (int r = 0; r < NUM_OF_ROADS; r++) {
-        list_t* road = roads[r];
+bool some_car_at_position(list_t* road, int8_t x, int8_t y) {
+    for (uint8_t i = 0; i < road->size; i++) {
+        car_t* car = (car_t*)list_get(road, i);
 
-        for (uint8_t i = 0; i < road->size; i++) {
-            car_t* car = (car_t*)list_get(road, i);
-
-            if (car->pos_x == x && car->pos_y == y) {
-                return true;
-            }
+        if (car->pos_x == x && car->pos_y == y) {
+            return true;
         }
     }
 
