@@ -6,14 +6,14 @@
 #include <semaphore.h>
 
 #include "list.h"
+#include "traffic_light.h"
 
 typedef struct game_t {
     list_t road1;
     list_t road2;
     sem_t road1_memmory;
     sem_t road2_memmory;
-    uint8_t move_road1;
-    uint8_t move_road2;
+    traffic_light_t traffic_light;
 } game_t;
 
 void game_init(game_t* game);

@@ -7,6 +7,8 @@
 #include "../lib/list.h"
 #include "../lib/game.h"
 #include "../lib/input.h"
+#include "../lib/traffic_light.h"
+#include "../lib/game_utils.h"
 
 void game_init(game_t* game) {
     list_init(&game->road1); // horizontal
@@ -15,8 +17,7 @@ void game_init(game_t* game) {
     sem_init(&game->road1_memmory, 0, 1);
     sem_init(&game->road2_memmory, 0, 1);
 
-    game->move_road1 = 0;
-    game->move_road2 = 0;
+    tl_init(&game->traffic_light, 0, 0);
 }
 
 void* commander(void* arg) {
@@ -28,11 +29,11 @@ void* commander(void* arg) {
         switch (command) {
             case 'h':
             case 'H':
-                game->move_road1 = !game->move_road1;
+                tl_toggle_horizontal(&game->traffic_light);
                 break;
             case 'v':
             case 'V':
-                game->move_road2 = !game->move_road2;
+                tl_toggle_vertical(&game->traffic_light);
                 break;
             default:
                 break;
@@ -43,8 +44,6 @@ void* commander(void* arg) {
 }
 
 void* car_factory(void* arg) {
-    // @todo semaphores to control access to roads memmory
-
     unsigned int random_number;
     srand(time(NULL));
 
@@ -89,8 +88,8 @@ void* car_factory(void* arg) {
 void* car_mover(void* arg) {
     game_t* game = (game_t*)arg;
 
-    list_t *road1 = &game->road1; // horizontal
-    list_t *road2 = &game->road2; // vertical
+    list_t* roads[] = {&game->road1, &game->road2};
+    traffic_light_t* tls[] = {&game->traffic_light};
 
     car_t* car_buffer = NULL;
 
@@ -98,18 +97,34 @@ void* car_mover(void* arg) {
         sem_wait(&game->road1_memmory);
         sem_wait(&game->road2_memmory);
 
-        if (game->move_road1) {
-            for (uint8_t i = 0; i < road1->size; i++) {
-                car_buffer = (car_t*)list_get(road1, i);
-                car_buffer->pos_x += 1;
+        // Process road 1
+        for (uint8_t i = 0; i < roads[0]->size; i++) {
+            car_buffer = (car_t*)list_get(roads[0], i);
+
+            if (some_car_at_position(roads, car_buffer->pos_x + 1, car_buffer->pos_y)) {
+                continue;
             }
+
+            if (some_red_tl_at_position(tls, car_buffer->pos_x + 1, car_buffer->pos_y, ORIENTATION_HORIZONTAL)) {
+                continue;
+            }
+
+            car_buffer->pos_x += 1;
         }
 
-        if (game->move_road2) {
-            for (uint8_t i = 0; i < road2->size; i++) {
-                car_buffer = (car_t*)list_get(road2, i);
-                car_buffer->pos_y += 1;
+        // Process road 2
+        for (uint8_t i = 0; i < roads[1]->size; i++) {
+            car_buffer = (car_t*)list_get(roads[1], i);
+
+            if (some_car_at_position(roads, car_buffer->pos_x, car_buffer->pos_y + 1)) {
+                continue;
             }
+
+            if (some_red_tl_at_position(tls, car_buffer->pos_x, car_buffer->pos_y + 1, ORIENTATION_VERTICAL)) {
+                continue;
+            }
+
+            car_buffer->pos_y += 1;
         }
 
         sem_post(&game->road1_memmory);
