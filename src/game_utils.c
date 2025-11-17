@@ -47,3 +47,46 @@ bool some_red_tl_at_position(
 
     return false;
 }
+
+uint8_t count_cars_waiting(
+    list_t* road,
+    traffic_light_t* tl,
+    uint8_t orientation
+) {
+    uint8_t count = 0;
+
+    for (uint8_t i = 0; i < road->size; i++) {
+        car_t* car = (car_t*)list_get(road, i);
+
+        if (
+            (orientation == ORIENTATION_HORIZONTAL && car->pos_x < tl->pos_x) ||
+            (orientation == ORIENTATION_VERTICAL && car->pos_y < tl->pos_y)
+        ) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+bool detect_collision(list_t* road1, list_t* road2) {
+    uint8_t cars_at_origin = 0;
+
+    for (uint8_t i = 0; i < road1->size; i++) {
+        car_t* car1 = (car_t*)list_get(road1, i);
+
+        if (car1->pos_x == 0 && car1->pos_y == 0) {
+            cars_at_origin++;
+        }
+    }
+
+    for (uint8_t j = 0; j < road2->size; j++) {
+        car_t* car2 = (car_t*)list_get(road2, j);
+
+        if (car2->pos_x == 0 && car2->pos_y == 0) {
+            cars_at_origin++;
+        }
+    }
+
+    return cars_at_origin > 1;
+}

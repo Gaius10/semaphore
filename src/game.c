@@ -289,10 +289,20 @@ void* game_state_manager(void* arg) {
     game_t* game = (game_t*)arg;
 
     while (game->status == GAME_RUNNING) {
-        sleep(10);
+        // Check for road overflow
+        uint8_t waiting_at_road1 = count_cars_waiting(&game->road1, &game->traffic_light, ORIENTATION_HORIZONTAL);
+        uint8_t waiting_at_road2 = count_cars_waiting(&game->road2, &game->traffic_light, ORIENTATION_VERTICAL);
 
-        // For demonstration, we will end the game after 10 seconds.
-        game->status = GAME_OVER;
+        if (waiting_at_road1 > MAX_CARS_WAITING || waiting_at_road2 > MAX_CARS_WAITING) {
+            game->status = GAME_OVER;
+            break;
+        }
+
+        // Check for collisions
+        if (detect_collision(&game->road1, &game->road2)) {
+            game->status = GAME_OVER;
+            break;
+        }
     }
 
     printf("Debugging: end of game_state_manager\n");

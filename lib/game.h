@@ -11,6 +11,8 @@
 #define GAME_RUNNING 1
 #define GAME_OVER 0
 
+#define MAX_CARS_WAITING 10
+
 typedef struct game_t {
     list_t road1;
     list_t road2;
