@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <semaphore.h>
+#include <pthread.h>
 #include <time.h>
 
 #include "../lib/list.h"
@@ -18,13 +19,17 @@ void game_init(game_t* game) {
     sem_init(&game->road2_memmory, 0, 1);
 
     tl_init(&game->traffic_light, 0, 0);
+    game->status = GAME_RUNNING;
 }
 
 void* commander(void* arg) {
     game_t* game = (game_t*)arg;
+
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
     char command;
 
-    while (1) {
+    while (game->status == GAME_RUNNING) {
         command = getch();
         switch (command) {
             case 'h':
@@ -40,6 +45,8 @@ void* commander(void* arg) {
         }
     }
 
+    printf("Debugging: end of commander\n");
+
     return NULL;
 }
 
@@ -54,7 +61,7 @@ void* car_factory(void* arg) {
 
     car_t* car_buffer = NULL;
 
-    while (1) {
+    while (game->status == GAME_RUNNING) {
         sleep(1);
 
         sem_wait(&game->road1_memmory);
@@ -82,6 +89,8 @@ void* car_factory(void* arg) {
         sem_post(&game->road2_memmory);
     }
 
+    printf("Debugging: end of car_factory\n");
+
     return NULL;
 }
 
@@ -95,7 +104,7 @@ void* car_mover(void* arg) {
 
     traffic_light_t* tls[] = {&game->traffic_light};
 
-    while (1) {
+    while (game->status == GAME_RUNNING) {
         sem_wait(&game->road1_memmory);
         sem_wait(&game->road2_memmory);
 
@@ -135,6 +144,8 @@ void* car_mover(void* arg) {
         sleep(1);
     }
 
+    printf("Debugging: end of car_mover\n");
+
     return NULL;
 }
 
@@ -146,7 +157,7 @@ void* world_renderer(void* arg) {
 
     car_t* car_buffer = NULL;
 
-    while (1) {
+    while (game->status == GAME_RUNNING) {
         system("clear");
 
         sem_wait(&game->road1_memmory);
@@ -184,15 +195,19 @@ void* world_renderer(void* arg) {
             printf("\n");
         }
 
-        printf("Traffic Light State - Horizontal: %s | Vertical: %s\n",
-               game->traffic_light.h_state == TL_GREEN ? "GREEN" : "RED",
-               game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED");
-
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);
 
-        sleep(1);
+        printf(
+            "Traffic Light State - Horizontal: %s | Vertical: %s\n",
+            game->traffic_light.h_state == TL_GREEN ? "GREEN" : "RED",
+            game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED"
+        );
+
+        usleep(1000 * 200);
     }
+
+    printf("Debugging: end of world_renderer\n");
 
     return NULL;
 }
@@ -205,7 +220,7 @@ void* world_renderer_debugger(void* arg) {
 
     car_t* car_buffer = NULL;
 
-    while (1) {
+    while (game->status == GAME_RUNNING) {
         system("clear");
 
         sem_wait(&game->road1_memmory);
@@ -243,6 +258,15 @@ void* world_renderer_debugger(void* arg) {
             printf("\n");
         }
 
+        sem_post(&game->road1_memmory);
+        sem_post(&game->road2_memmory);
+
+        printf(
+            "Traffic Light State - Horizontal: %s | Vertical: %s\n",
+            game->traffic_light.h_state == TL_GREEN ? "GREEN" : "RED",
+            game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED"
+        );
+
         for (uint8_t i = 0; i < road1->size; i++) {
             car_buffer = (car_t*)list_get(road1, i);
             printf("Road 1 - Car %d: Position X: %d | Position Y: %d\n", i, car_buffer->pos_x, car_buffer->pos_y);
@@ -253,11 +277,25 @@ void* world_renderer_debugger(void* arg) {
             printf("Road 2 - Car %d: Position X: %d | Position Y: %d\n", i, car_buffer->pos_x, car_buffer->pos_y);
         }
 
-        sem_post(&game->road1_memmory);
-        sem_post(&game->road2_memmory);
-
-        sleep(1);
+        usleep(1000 * 200);
     }
+
+    printf("Debugging: end of world_renderer_debugger\n");
+
+    return NULL;
+}
+
+void* game_state_manager(void* arg) {
+    game_t* game = (game_t*)arg;
+
+    while (game->status == GAME_RUNNING) {
+        sleep(10);
+
+        // For demonstration, we will end the game after 10 seconds.
+        game->status = GAME_OVER;
+    }
+
+    printf("Debugging: end of game_state_manager\n");
 
     return NULL;
 }
