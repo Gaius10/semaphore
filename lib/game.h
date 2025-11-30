@@ -20,6 +20,8 @@ typedef struct game_t {
     sem_t road2_memmory;
     traffic_light_t traffic_light;
     uint8_t status;
+    unsigned int score; // Number of cars that have successfully passed the intersection
+    unsigned int cycles_passed;
 } game_t;
 
 void game_init(game_t* game);

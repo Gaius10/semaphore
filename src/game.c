@@ -20,6 +20,8 @@ void game_init(game_t* game) {
 
     tl_init(&game->traffic_light, 0, 0);
     game->status = GAME_RUNNING;
+    game->score = 0;
+    game->cycles_passed = 0;
 }
 
 void* commander(void* arg) {
@@ -120,6 +122,10 @@ void* car_mover(void* arg) {
                 continue;
             }
 
+            if (some_green_tl_at_position(tls, car_buffer->pos_x + 1, car_buffer->pos_y, ORIENTATION_HORIZONTAL)) {
+                game->score++;
+            }
+
             car_buffer->pos_x += 1;
 
             if (car_buffer->pos_x > 10) {
@@ -140,6 +146,10 @@ void* car_mover(void* arg) {
                 continue;
             }
 
+            if (some_green_tl_at_position(tls, car_buffer->pos_x, car_buffer->pos_y + 1, ORIENTATION_VERTICAL)) {
+                game->score++;
+            }
+
             car_buffer->pos_y += 1;
 
             if (car_buffer->pos_y > 10) {
@@ -147,6 +157,8 @@ void* car_mover(void* arg) {
                 i--;
             }
         }
+
+        game->cycles_passed++;
 
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);
@@ -214,6 +226,8 @@ void* world_renderer(void* arg) {
             game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED"
         );
 
+        printf("Score: %u | Cycles Passed: %u\n", game->score, game->cycles_passed);
+
         usleep(1000 * 200);
     }
 
@@ -276,6 +290,8 @@ void* world_renderer_debugger(void* arg) {
             game->traffic_light.h_state == TL_GREEN ? "GREEN" : "RED",
             game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED"
         );
+
+        printf("Score: %u | Cycles Passed: %u\n", game->score, game->cycles_passed);
 
         for (uint8_t i = 0; i < road1->size; i++) {
             car_buffer = (car_t*)list_get(road1, i);
