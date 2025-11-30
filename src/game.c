@@ -64,7 +64,7 @@ void* car_factory(void* arg) {
     car_t* car_buffer = NULL;
 
     while (game->status == GAME_RUNNING) {
-        sleep(1);
+        usleep(1000 * 1000 / GAME_FREQUENCY_IN_HERTZ);
 
         sem_wait(&game->road1_memmory);
         sem_wait(&game->road2_memmory);
@@ -163,7 +163,7 @@ void* car_mover(void* arg) {
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);
 
-        sleep(1);
+        usleep(1000 * 1000 / GAME_FREQUENCY_IN_HERTZ);
     }
 
     printf("Debugging: end of car_mover\n");
@@ -228,7 +228,7 @@ void* world_renderer(void* arg) {
 
         printf("Score: %u | Cycles Passed: %u\n", game->score, game->cycles_passed);
 
-        usleep(1000 * 200);
+        usleep(1000 * 100);
     }
 
     printf("Debugging: end of world_renderer\n");
@@ -303,7 +303,7 @@ void* world_renderer_debugger(void* arg) {
             printf("Road 2 - Car %d: Position X: %d | Position Y: %d\n", i, car_buffer->pos_x, car_buffer->pos_y);
         }
 
-        usleep(1000 * 200);
+        usleep(1000 * 100);
     }
 
     printf("Debugging: end of world_renderer_debugger\n");

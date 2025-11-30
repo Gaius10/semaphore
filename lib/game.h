@@ -13,6 +13,8 @@
 
 #define MAX_CARS_WAITING 10
 
+#define GAME_FREQUENCY_IN_HERTZ 3
+
 typedef struct game_t {
     list_t road1;
     list_t road2;
