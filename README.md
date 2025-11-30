@@ -134,6 +134,56 @@ LDLIBS  := -lm -lpthread
 
 The project uses C11 standard with strict compiler warnings and optimization level 3.
 
+## POSIX Semaphores Implementation
+
+This project uses POSIX semaphores for thread synchronization and mutual exclusion. Here's how they are implemented:
+
+### Semaphore Initialization
+
+In `game_init()` (game.c), two semaphores are created for managing access to each road:
+
+```c
+sem_init(&game->road1_memmory, 0, 1);
+sem_init(&game->road2_memmory, 0, 1);
+```
+
+- **First parameter**: Pointer to the semaphore variable
+- **Second parameter**: `0` indicates this is a process-local semaphore (not shared between processes)
+- **Third parameter**: Initial value of `1` creates a binary semaphore (mutex), allowing one thread to hold the resource at a time
+
+### Resource Protection
+
+The semaphores act as binary mutexes (mutex) with initial value of 1, ensuring only one car can access each road at a time:
+
+- **`sem_wait()`**: Decrements the semaphore. If the value is 0, the thread blocks until the semaphore is incremented by another thread
+- **`sem_post()`**: Increments the semaphore, waking up any blocked threads
+
+### Usage Pattern
+
+When multiple `car_mover` threads attempt to access a road:
+
+1. Thread calls `sem_wait()` on road semaphore
+2. If semaphore > 0, value decrements and thread proceeds (acquires resource)
+3. If semaphore = 0, thread blocks until another thread calls `sem_post()`
+4. After accessing the road, thread calls `sem_post()` to release the resource
+5. Next blocked thread wakes up and proceeds
+
+### Maximum Capacity
+
+The `MAX_CARS_WAITING` constant (defined as 10 in game.h) limits cars waiting on each road queue. Combined with the binary semaphores, this ensures:
+
+- No more than one car actively moves through each road segment
+- Cars queue in linked lists when the road is occupied
+- Fair scheduling of car movement across threads
+
+### Thread Safety
+
+This implementation guarantees:
+- **Mutual exclusion**: Only one thread can modify a road's linked list at a time
+- **No race conditions**: Car position updates are atomic with respect to list modifications
+- **Prevention of deadlocks**: Simple binary semaphore with no circular waits
+- **No busy-waiting**: Threads sleep when semaphore is 0, allowing CPU time for other threads
+
 ## Author
 
 Caio Corrêa Chaves (15444406)
