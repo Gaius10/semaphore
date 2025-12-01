@@ -320,12 +320,14 @@ void* game_state_manager(void* arg) {
         uint8_t waiting_at_road2 = count_cars_waiting(&game->road2, &game->traffic_light, ORIENTATION_VERTICAL);
 
         if (waiting_at_road1 > MAX_CARS_WAITING || waiting_at_road2 > MAX_CARS_WAITING) {
+            printf("Debugging: Road overflow detected (Road1: %d, Road2: %d)\n", waiting_at_road1, waiting_at_road2);
             game->status = GAME_OVER;
             break;
         }
 
         // Check for collisions
         if (detect_collision(&game->road1, &game->road2)) {
+            printf("Debugging: Collision detected!\n");
             game->status = GAME_OVER;
             break;
         }
