@@ -4,4 +4,4 @@ WORKDIR /app
 COPY . .
 RUN make
 
-CMD ["./main"]
+CMD ["./main", "default"]
