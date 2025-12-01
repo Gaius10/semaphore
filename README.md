@@ -28,7 +28,8 @@ semaphore/
 │   ├── traffic_light.h   # Traffic light state management
 │   ├── list.h            # Sequential list for car queues
 │   ├── input.h           # User input handling
-│   └── game_utils.h      # Utility functions
+│   ├── game_utils.h      # Utility functions
+│   └── ai.h              # AI commander implementations
 └── src/                   # Source files
     ├── main.c            # Entry point
     ├── game.c            # Game initialization and threading logic
@@ -36,7 +37,8 @@ semaphore/
     ├── traffic_light.c   # Traffic light toggling
     ├── list.c            # Sequential list implementation
     ├── input.c           # Input handling
-    └── game_utils.c      # Utility function implementations
+    ├── game_utils.c      # Utility function implementations
+    └── ai.c              # AI commander logic
 ```
 
 ## Key Features
@@ -93,14 +95,19 @@ make docker-run
 make run
 ```
 
-Or directly:
+Or directly with a mode:
 ```bash
-./main
+./main <mode>
 ```
 
-### Interactive Controls
+### Available Modes
 
-While the simulation is running:
+- **`default`**: Interactive mode with keyboard controls
+- **`fixed_toggle`**: Automated AI commander that toggles traffic lights every 5 cycles (0.5 seconds apart)
+
+### Interactive Controls (default mode)
+
+While the simulation is running in default mode:
 - **H**: Toggle horizontal (left-right) traffic light
 - **V**: Toggle vertical (up-down) traffic light
 
@@ -133,6 +140,34 @@ LDLIBS  := -lm -lpthread
 ```
 
 The project uses C11 standard with strict compiler warnings and optimization level 3.
+
+## AI Commander
+
+The project includes an AI-driven traffic light controller that automatically manages the intersection without user input.
+
+### Fixed Toggle Mode
+
+The `fixed_toggle` AI mode implements a simple but effective traffic management strategy:
+
+- **Behavior**: Toggles both horizontal and vertical traffic lights every 5 game cycles
+- **Interval**: 0.5 seconds between toggle operations
+- **Purpose**: Provides fair and alternating access to each road direction
+- **Implementation**: Runs in the commander thread, checking `game->cycles_passed` to trigger toggles
+
+This mode is useful for:
+- Automated testing and demonstrations
+- Baseline comparison for more sophisticated AI algorithms
+- Understanding traffic light coordination without manual intervention
+
+### Commander Factory Pattern
+
+The `commander_factory()` function in `main.c` implements a factory pattern to select the appropriate commander function based on the command-line argument:
+
+```c
+void*(*commander_factory(const char *mode))(void*);
+```
+
+This design allows for easy addition of new commander modes (e.g., more sophisticated AI algorithms) without modifying the main thread creation logic.
 
 ## POSIX Semaphores Implementation
 

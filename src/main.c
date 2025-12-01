@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     pthread_t game_state_thread;
 
     if (argc != 2) {
-        fprintf(stderr, "Usage: %s mode\n", argv[0]);
+        fprintf(stderr, "Usage: %s <mode>\n", argv[0]);
         fprintf(stderr, "Available modes: default, fixed_toggle\n");
         return EXIT_FAILURE;
     }
