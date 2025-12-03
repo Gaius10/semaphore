@@ -124,7 +124,11 @@ struct options parse_arguments(int argc, char* argv[]) {
             continue;
         }
 
-        if (strcmp(argv[i], "--number_of_games") == 0) {
+        if (
+            strcmp(argv[i], "--number_of_games") == 0 ||
+            strcmp(argv[i], "--games") == 0 ||
+            strcmp(argv[i], "-n") == 0
+        ) {
             i++;
 
             if (sscanf(argv[i], "%u", &opts.number_of_games) != 1) {

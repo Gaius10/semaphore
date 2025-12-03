@@ -95,19 +95,52 @@ make docker-run
 make run
 ```
 
-Or directly with a mode:
+Or directly with command-line flags:
 ```bash
-./main <mode>
+./main [OPTIONS]
 ```
 
-### Available Modes
+### Command-Line Options
 
-- **`default`**: Interactive mode with keyboard controls
-- **`fixed_toggle`**: Automated AI commander that toggles traffic lights every 5 cycles (0.5 seconds apart)
+```
+-h                              Show help message
+--debug                         Enable debug output
+--mode <mode>                   Set execution mode:
+  - default                     Interactive mode with visual rendering
+  - performance_statistics      Headless mode for performance analysis
+--commander <type>             Set traffic light controller:
+  - player                      Manual control with keyboard
+  - fixed_toggle                AI controller with fixed toggle intervals
+--number_of_games <n>          Number of games to simulate (default: 1)
+--games <n>                    Alias for --number_of_games
+-n <number>                    Short alias for --number_of_games
+```
 
-### Interactive Controls (default mode)
+### Example Usage
 
-While the simulation is running in default mode:
+Interactive mode with keyboard control:
+```bash
+./main --mode default --commander player
+```
+
+Automated simulation with AI controller:
+```bash
+./main --mode default --commander fixed_toggle
+```
+
+Headless performance testing:
+```bash
+./main --mode performance_statistics --commander fixed_toggle --games 5
+```
+
+With debug output:
+```bash
+./main --debug --mode default --commander player
+```
+
+### Interactive Controls (player commander mode)
+
+While the simulation is running with the player commander:
 - **H**: Toggle horizontal (left-right) traffic light
 - **V**: Toggle vertical (up-down) traffic light
 
@@ -123,6 +156,13 @@ The traffic light states cycle between RED and GREEN.
   - Traffic light state
   - Game status and score
   - Cycle counter
+  - Options structure for configuration
+
+- **options**: Configuration structure containing:
+  - `mode`: Execution mode (DEFAULT or PERFORMANCE_STATS)
+  - `commander`: Traffic light controller type (PLAYER or FIXED_TOGGLE)
+  - `number_of_games`: Number of games to simulate
+  - `debug`: Debug output flag
 
 - **car_t**: Individual car with position coordinates (x, y)
 
@@ -141,13 +181,36 @@ LDLIBS  := -lm -lpthread
 
 The project uses C11 standard with strict compiler warnings and optimization level 3.
 
-## AI Commander
+## Execution Modes
 
-The project includes an AI-driven traffic light controller that automatically manages the intersection without user input.
+### Default Mode
 
-### Fixed Toggle Mode
+The `default` mode provides interactive visual rendering of the traffic simulation:
+- Real-time display of car positions and traffic light states
+- Game statistics (cycle count, score)
+- Suitable for manual testing and observation
+- Renderer thread runs concurrently with game logic
 
-The `fixed_toggle` AI mode implements a simple but effective traffic management strategy:
+### Performance Statistics Mode
+
+The `performance_statistics` mode runs the simulation without visual rendering:
+- Headless execution for performance benchmarking
+- Faster execution since no rendering overhead
+- Useful for testing multiple game cycles rapidly
+- Outputs final statistics after completion
+
+## Commander Types
+
+### Player Commander
+
+Manual control of traffic lights via keyboard input:
+- Responds to user input in real-time
+- Allows testing manual traffic management strategies
+- Requires interactive mode to observe results
+
+### Fixed Toggle Commander
+
+Automated AI controller implementing a simple traffic management strategy:
 
 - **Behavior**: Toggles both horizontal and vertical traffic lights every 5 game cycles
 - **Interval**: 0.5 seconds between toggle operations
@@ -161,13 +224,13 @@ This mode is useful for:
 
 ### Commander Factory Pattern
 
-The `commander_factory()` function in `main.c` implements a factory pattern to select the appropriate commander function based on the command-line argument:
+The `commander_factory()` function in `main.c` implements a factory pattern to select the appropriate commander function based on the options:
 
 ```c
-void*(*commander_factory(const char *mode))(void*);
+void*(*commander_factory(enum commander commander_type))(void*);
 ```
 
-This design allows for easy addition of new commander modes (e.g., more sophisticated AI algorithms) without modifying the main thread creation logic.
+This design allows for easy addition of new commander types without modifying the main thread creation logic.
 
 ## POSIX Semaphores Implementation
 
