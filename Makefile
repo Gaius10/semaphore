@@ -1,6 +1,6 @@
 
 CC      := gcc
-CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O3
+CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O3 -D_POSIX_C_SOURCE=199309L
 LDFLAGS :=
 LDLIBS  := -lm -lpthread -lc
 TARGET  := main
@@ -25,7 +25,7 @@ build/%.o: src/%.c lib/game.h lib/car.h lib/list.h lib/input.h lib/traffic_light
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)
-	./$(TARGET) default
+	./$(TARGET)
 
 clean:
 	rm -f $(OBJS) $(TARGET)

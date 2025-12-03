@@ -1,5 +1,6 @@
+#include <stdio.h>
+#include <time.h>
 #include <stddef.h>
-#include <unistd.h>
 
 #include "../lib/game.h"
 #include "../lib/traffic_light.h"
@@ -18,7 +19,8 @@ void* ai_commander_fixed_toggle(void* arg) {
         }
 
         // Sleep for a short duration to simulate time passing
-        usleep(1000*500); // 0.5 seconds
+        struct timespec ts = {0, 500000000}; // 0.5 seconds
+        nanosleep(&ts, NULL);
     }
 
     return NULL;

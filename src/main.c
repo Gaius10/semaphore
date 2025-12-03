@@ -6,13 +6,39 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <string.h>
+#include <stdbool.h>
 
 #include "../lib/game.h"
 #include "../lib/ai.h"
+#include "../lib/input.h"
 
-void*(*commander_factory(const char *mode))(void*);
+void*(*commander_factory(enum commander commander_type))(void*);
+struct options parse_arguments(int argc, char* argv[]);
+void print_usage(FILE* file, char* current_filename);
+void start_game(struct options opts);
 
 int main(int argc, char *argv[]) {
+    if (argc > 8) {
+        print_usage(stderr, argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    struct options opts = parse_arguments(argc, argv);
+    start_game(opts);
+
+    return EXIT_SUCCESS;
+}
+
+void start_game(struct options opts) {
+    if (opts.debug == true) {
+        printf("Starting game with the following options:\n");
+        printf("Mode: %d\n", opts.mode);
+        printf("Commander: %d\n", opts.commander);
+        printf("Number of games: %u\n", opts.number_of_games);
+        printf("Debug: %s\n", opts.debug ? "On" : "Off");
+        getch();
+    }
+
     game_t game;
 
     pthread_t car_factory_thread;
@@ -21,41 +47,136 @@ int main(int argc, char *argv[]) {
     pthread_t commander_thread;
     pthread_t game_state_thread;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: %s <mode>\n", argv[0]);
-        fprintf(stderr, "Available modes: default, fixed_toggle\n");
-        return EXIT_FAILURE;
-    }
-
-    game_init(&game);
+    game_init(&game, opts);
 
     pthread_create(&car_factory_thread, NULL, car_factory, &game);
     pthread_create(&car_mover_thread, NULL, car_mover, &game);
-    pthread_create(&world_renderer_thread, NULL, world_renderer, &game);
     pthread_create(&game_state_thread, NULL, game_state_manager, &game);
-    pthread_create(&commander_thread, NULL, commander_factory(argv[1]), &game);
+    pthread_create(&commander_thread, NULL, commander_factory(opts.commander), &game);
+
+    if (opts.mode == MODE_DEFAULT) {
+        pthread_create(&world_renderer_thread, NULL, world_renderer, &game);
+    }
 
     pthread_join(car_factory_thread, NULL);
     pthread_join(car_mover_thread, NULL);
-    pthread_join(world_renderer_thread, NULL);
     pthread_join(game_state_thread, NULL);
+
+    if (opts.mode == MODE_DEFAULT) {
+        pthread_join(world_renderer_thread, NULL);
+    }
 
     pthread_cancel(commander_thread);
 
-    printf("Game Over!\n");
-
-    return EXIT_SUCCESS;
+    if (opts.debug == true) {
+        printf("Game Over!\n");
+    }
 }
 
-void*(*commander_factory(const char *mode))(void*) {
-    if (strcmp(mode, "default") == 0) {
+struct options parse_arguments(int argc, char* argv[]) {
+    struct options opts = {
+        .mode = MODE_DEFAULT,
+        .commander = COMMANDER_PLAYER,
+        .number_of_games = 1,
+        .debug = false
+    };
+
+    for (uint8_t i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-h") == 0) {
+            print_usage(stdout, argv[0]);
+            exit(EXIT_SUCCESS);
+        }
+
+        if (strcmp(argv[i], "--debug") == 0) {
+            opts.debug = true;
+            continue;
+        }
+
+        if (strcmp(argv[i], "--mode") == 0) {
+            i++;
+
+            if (strcmp(argv[i], "performance_statistics") == 0) {
+                opts.mode = MODE_PERFORMANCE_STATS;
+                continue;
+            }
+
+            if (strcmp(argv[i], "default") != 0) {
+                fprintf(stderr, "Error: invalid mode: %s\n", argv[i]);
+                exit(EXIT_FAILURE);
+            }
+
+            continue;
+        }
+
+        if (strcmp(argv[i], "--commander") == 0) {
+            i++;
+
+            if (strcmp(argv[i], "fixed_toggle") == 0) {
+                opts.commander = COMMANDER_FIXED_TOGGLE;
+                continue;
+            }
+
+            if (strcmp(argv[i], "player") != 0) {
+                fprintf(stderr, "Error: invalid commander: %s\n", argv[i]);
+                exit(EXIT_FAILURE);
+            }
+
+            continue;
+        }
+
+        if (strcmp(argv[i], "--number_of_games") == 0) {
+            i++;
+
+            if (sscanf(argv[i], "%u", &opts.number_of_games) != 1) {
+                fprintf(stderr, "Error reading number of games\n");
+                exit(EXIT_FAILURE);
+            }
+
+            continue;
+        }
+
+        // If code reaches this point, input is in a invalid format
+        fprintf(stderr, "Invalid input format.\n");
+        fprintf(stderr, "Use: %s -h for help\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    if (opts.number_of_games == 0) {
+        fprintf(stderr, "Error: number_of_games must be greater than 0\n");
+        print_usage(stderr, argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    if (opts.number_of_games > 1 && opts.mode == MODE_DEFAULT) {
+        fprintf(stderr, "Error: default mode only works with a single game\n");
+        print_usage(stderr, argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    if (opts.commander == COMMANDER_PLAYER && opts.mode != MODE_DEFAULT) {
+        fprintf(stderr, "Error: player commander only works with default mode\n");
+        print_usage(stderr, argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    return opts;
+}
+
+void*(*commander_factory(enum commander commander_type))(void*) {
+    if (commander_type == COMMANDER_PLAYER) {
         return commander;
     }
 
-    if (strcmp(mode, "fixed_toggle") == 0) {
+    if (commander_type == COMMANDER_FIXED_TOGGLE) {
         return ai_commander_fixed_toggle;
     }
 
-    fprintf(stderr, "Unknown mode: %s\n", mode);
+    fprintf(stderr, "Error: failed to load commander.\n");
     exit(EXIT_FAILURE);
+}
+
+void print_usage(FILE* file, char* current_filename) {
+    fprintf(file, "Usage: %s [--mode <mode> --commander <commander> --number_of_games <n> --debug]\n", current_filename);
+    fprintf(file, "Available modes: default, performance_statistics\n");
+    fprintf(file, "Available commanders: player, fixed_toggle\n");
 }
