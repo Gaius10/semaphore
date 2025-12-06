@@ -103,17 +103,16 @@ Or directly with command-line flags:
 ### Command-Line Options
 
 ```
--h                              Show help message
---debug                         Enable debug output
---mode <mode>                   Set execution mode:
+-h                           Show help message
+--mode <mode>                Set execution mode:
   - default                     Interactive mode with visual rendering
-  - performance_statistics      Headless mode for performance analysis
---commander <type>             Set traffic light controller:
+  - performance_stats           Headless mode for performance analysis
+--commander <type>           Set traffic light controller:
   - player                      Manual control with keyboard
   - fixed_toggle                AI controller with fixed toggle intervals
---number_of_games <n>          Number of games to simulate (default: 1)
---games <n>                    Alias for --number_of_games
--n <number>                    Short alias for --number_of_games
+--number_of_games <n>        Number of games to simulate (default: 1)
+--games <n>                  Alias for --number_of_games
+-n <number>                  Short alias for --number_of_games
 ```
 
 ### Example Usage
@@ -285,6 +284,7 @@ This implementation guarantees:
 ## Author
 
 Caio Corrêa Chaves (15444406)
+Gustavo Henrique Nogueira de Andrade Filho (16871388)
 
 ## License
 
