@@ -82,6 +82,7 @@ struct options parse_arguments(int argc, char* argv[]) {
     for (uint8_t i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0) {
             print_usage(stdout, argv[0]);
+            resetTermios();
             exit(EXIT_SUCCESS);
         }
 
@@ -100,6 +101,7 @@ struct options parse_arguments(int argc, char* argv[]) {
 
             if (strcmp(argv[i], "default") != 0) {
                 fprintf(stderr, "Error: invalid mode: %s\n", argv[i]);
+                resetTermios();
                 exit(EXIT_FAILURE);
             }
 
@@ -116,6 +118,7 @@ struct options parse_arguments(int argc, char* argv[]) {
 
             if (strcmp(argv[i], "player") != 0) {
                 fprintf(stderr, "Error: invalid commander: %s\n", argv[i]);
+                resetTermios();
                 exit(EXIT_FAILURE);
             }
 
@@ -131,6 +134,7 @@ struct options parse_arguments(int argc, char* argv[]) {
 
             if (sscanf(argv[i], "%u", &opts.number_of_games) != 1) {
                 fprintf(stderr, "Error reading number of games\n");
+                resetTermios();
                 exit(EXIT_FAILURE);
             }
 
@@ -140,24 +144,28 @@ struct options parse_arguments(int argc, char* argv[]) {
         // If code reaches this point, input is in a invalid format
         fprintf(stderr, "Invalid input format.\n");
         fprintf(stderr, "Use: %s -h for help\n", argv[0]);
+        resetTermios();
         exit(EXIT_FAILURE);
     }
 
     if (opts.number_of_games == 0) {
         fprintf(stderr, "Error: number_of_games must be greater than 0\n");
         print_usage(stderr, argv[0]);
+        resetTermios();
         exit(EXIT_FAILURE);
     }
 
     if (opts.number_of_games > 1 && opts.mode == MODE_DEFAULT) {
         fprintf(stderr, "Error: default mode only works with a single game\n");
         print_usage(stderr, argv[0]);
+        resetTermios();
         exit(EXIT_FAILURE);
     }
 
     if (opts.commander == COMMANDER_PLAYER && opts.mode != MODE_DEFAULT) {
         fprintf(stderr, "Error: player commander only works with default mode\n");
         print_usage(stderr, argv[0]);
+        resetTermios();
         exit(EXIT_FAILURE);
     }
 
@@ -190,9 +198,4 @@ void print_usage(FILE* file, char* current_filename) {
     fprintf(file, "                          Note: player commander only supports default mode\n");
     fprintf(file, "                          Aliases: --games, -n\n");
     fprintf(file, "  --debug                 Enable debug mode\n");
-
-
-    fprintf(file, "Usage: %s [--mode <mode> --commander <commander> --number_of_games <n> --debug]\n", current_filename);
-    fprintf(file, "Available modes: default, performance_statistics\n");
-    fprintf(file, "Available commanders: player, fixed_toggle\n");
 }
