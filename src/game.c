@@ -1,3 +1,5 @@
+#include "../lib/config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <semaphore.h>
@@ -13,7 +15,7 @@
 
 static struct timespec ts_sleep = {0, 1000000000 / GAME_FREQUENCY_IN_HERTZ};
 
-void game_init(game_t* game, struct options opts) {
+void game_init(game_t* game) {
     list_init(&game->road1); // horizontal
     list_init(&game->road2); // vertical
 
@@ -25,8 +27,6 @@ void game_init(game_t* game, struct options opts) {
     game->status = GAME_RUNNING;
     game->score = 0;
     game->cycles_passed = 0;
-
-    game->opts = opts;
 }
 
 void* commander(void* arg) {
@@ -52,7 +52,7 @@ void* commander(void* arg) {
         }
     }
 
-    if (game->opts.debug == true) {
+    if (DEBUG) {
         printf("Debugging: end of commander\n");
     }
 
@@ -98,7 +98,7 @@ void* car_factory(void* arg) {
         sem_post(&game->road2_memmory);
     }
 
-    if (game->opts.debug == true) {
+    if (DEBUG) {
         printf("Debugging: end of car_factory\n");
     }
 
@@ -175,7 +175,7 @@ void* car_mover(void* arg) {
         nanosleep(&ts_sleep, NULL);
     }
 
-    if (game->opts.debug == true) {
+    if (DEBUG) {
         printf("Debugging: end of car_mover\n");
     }
 
@@ -239,7 +239,7 @@ void* world_renderer(void* arg) {
 
         printf("Score: %u | Cycles Passed: %u\n", game->score, game->cycles_passed);
 
-        if (game->opts.debug == true) {
+        if (DEBUG) {
             for (uint8_t i = 0; i < road1->size; i++) {
                 car_buffer = (car_t*)list_get(road1, i);
                 printf("Road 1 - Car %d: Position X: %d | Position Y: %d\n", i, car_buffer->pos_x, car_buffer->pos_y);
@@ -255,7 +255,7 @@ void* world_renderer(void* arg) {
         nanosleep(&ts, NULL);
     }
 
-    if (game->opts.debug == true) {
+    if (DEBUG) {
         printf("Debugging: end of world_renderer_debugger\n");
     }
 
@@ -271,7 +271,7 @@ void* game_state_manager(void* arg) {
         uint8_t waiting_at_road2 = count_cars_waiting(&game->road2, &game->traffic_light, ORIENTATION_VERTICAL);
 
         if (waiting_at_road1 > MAX_CARS_WAITING || waiting_at_road2 > MAX_CARS_WAITING) {
-            if (game->opts.debug == true) {
+            if (DEBUG) {
                 printf("Debugging: Road overflow detected (Road1: %d, Road2: %d)\n", waiting_at_road1, waiting_at_road2);
             }
 
@@ -281,7 +281,7 @@ void* game_state_manager(void* arg) {
 
         // Check for collisions
         if (detect_collision(&game->road1, &game->road2)) {
-            if (game->opts.debug == true) {
+            if (DEBUG) {
                 printf("Debugging: Collision detected!\n");
             }
 
@@ -290,7 +290,7 @@ void* game_state_manager(void* arg) {
         }
     }
 
-    if (game->opts.debug == true) {
+    if (DEBUG) {
         printf("Debugging: end of game_state_manager\n");
     }
 

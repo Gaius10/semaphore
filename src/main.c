@@ -1,4 +1,6 @@
 // Caio Corrêa Chaves - 15444406
+// Gustavo Henrique Nogueira de Andrade Filho - 16871388
+#include "../lib/config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,28 +14,41 @@
 #include "../lib/ai.h"
 #include "../lib/input.h"
 
+struct options {
+    enum mode {
+        MODE_DEFAULT,
+        MODE_PERFORMANCE_STATS
+    } mode;
+
+    enum commander {
+        COMMANDER_PLAYER,
+        COMMANDER_FIXED_TOGGLE,
+    } commander;
+
+    unsigned int number_of_games;
+};
+
 void*(*commander_factory(enum commander commander_type))(void*);
 struct options parse_arguments(int argc, char* argv[]);
 void print_usage(FILE* file, char* current_filename);
-void start_game(struct options opts);
+void run(struct options opts);
 
 int main(int argc, char *argv[]) {
     initTermios();
 
     struct options opts = parse_arguments(argc, argv);
-    start_game(opts);
+    run(opts);
 
     resetTermios();
     return EXIT_SUCCESS;
 }
 
-void start_game(struct options opts) {
-    if (opts.debug == true) {
+void run(struct options opts) {
+    if (DEBUG) {
         printf("Starting game with the following options:\n");
         printf("Mode: %d\n", opts.mode);
         printf("Commander: %d\n", opts.commander);
         printf("Number of games: %u\n", opts.number_of_games);
-        printf("Debug: %s\n", opts.debug ? "On" : "Off");
         getchar();
     }
 
@@ -45,7 +60,7 @@ void start_game(struct options opts) {
     pthread_t commander_thread;
     pthread_t game_state_thread;
 
-    game_init(&game, opts);
+    game_init(&game);
 
     pthread_create(&car_factory_thread, NULL, car_factory, &game);
     pthread_create(&car_mover_thread, NULL, car_mover, &game);
@@ -66,7 +81,7 @@ void start_game(struct options opts) {
 
     pthread_cancel(commander_thread);
 
-    if (opts.debug == true) {
+    if (DEBUG) {
         printf("Game Over!\n");
     }
 }
@@ -76,7 +91,6 @@ struct options parse_arguments(int argc, char* argv[]) {
         .mode = MODE_DEFAULT,
         .commander = COMMANDER_PLAYER,
         .number_of_games = 1,
-        .debug = false
     };
 
     for (uint8_t i = 1; i < argc; i++) {
@@ -84,11 +98,6 @@ struct options parse_arguments(int argc, char* argv[]) {
             print_usage(stdout, argv[0]);
             resetTermios();
             exit(EXIT_SUCCESS);
-        }
-
-        if (strcmp(argv[i], "--debug") == 0) {
-            opts.debug = true;
-            continue;
         }
 
         if (strcmp(argv[i], "--mode") == 0) {
@@ -197,5 +206,4 @@ void print_usage(FILE* file, char* current_filename) {
     fprintf(file, "                          Note: default mode only supports a single game\n");
     fprintf(file, "                          Note: player commander only supports default mode\n");
     fprintf(file, "                          Aliases: --games, -n\n");
-    fprintf(file, "  --debug                 Enable debug mode\n");
 }

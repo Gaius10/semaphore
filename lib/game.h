@@ -12,25 +12,6 @@
 #define GAME_RUNNING 1
 #define GAME_OVER 0
 
-#define MAX_CARS_WAITING 10
-
-#define GAME_FREQUENCY_IN_HERTZ 3
-
-struct options {
-    enum mode {
-        MODE_DEFAULT,
-        MODE_PERFORMANCE_STATS
-    } mode;
-
-    enum commander {
-        COMMANDER_PLAYER,
-        COMMANDER_FIXED_TOGGLE,
-    } commander;
-
-    unsigned int number_of_games;
-    bool debug;
-};
-
 typedef struct game_t {
     list_t road1;
     list_t road2;
@@ -40,10 +21,9 @@ typedef struct game_t {
     uint8_t status;
     unsigned int score; // Number of cars that have successfully passed the intersection
     unsigned int cycles_passed;
-    struct options opts;
 } game_t;
 
-void game_init(game_t* game, struct options opts);
+void game_init(game_t* game);
 
 void* commander(void* arg);
 

@@ -1,4 +1,3 @@
-
 CC      := gcc
 CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O3 -D_POSIX_C_SOURCE=199309L
 LDFLAGS :=
@@ -21,7 +20,7 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LDLIBS)
 
-build/%.o: src/%.c lib/game.h lib/car.h lib/list.h lib/input.h lib/traffic_light.h lib/game_utils.h lib/ai.h
+build/%.o: src/%.c lib/game.h lib/car.h lib/list.h lib/input.h lib/traffic_light.h lib/game_utils.h lib/ai.h lib/config.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)
