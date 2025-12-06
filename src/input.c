@@ -18,14 +18,3 @@ void resetTermios(void)
 {
     tcsetattr(0, TCSANOW, &old);
 }
-
-char getch(void)
-{
-    char ch;
-
-    initTermios();
-    ch = getchar();
-    resetTermios();
-
-    return ch;
-}

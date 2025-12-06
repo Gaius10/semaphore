@@ -37,7 +37,7 @@ void* commander(void* arg) {
     char command;
 
     while (game->status == GAME_RUNNING) {
-        command = getch();
+        command = getchar();
         switch (command) {
             case 'h':
             case 'H':

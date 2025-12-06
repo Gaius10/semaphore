@@ -1,6 +1,7 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-char getch(void);
+void initTermios();
+void resetTermios(void);
 
 #endif

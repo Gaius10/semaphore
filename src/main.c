@@ -18,14 +18,12 @@ void print_usage(FILE* file, char* current_filename);
 void start_game(struct options opts);
 
 int main(int argc, char *argv[]) {
-    if (argc > 8) {
-        print_usage(stderr, argv[0]);
-        return EXIT_FAILURE;
-    }
+    initTermios();
 
     struct options opts = parse_arguments(argc, argv);
     start_game(opts);
 
+    resetTermios();
     return EXIT_SUCCESS;
 }
 
@@ -36,7 +34,7 @@ void start_game(struct options opts) {
         printf("Commander: %d\n", opts.commander);
         printf("Number of games: %u\n", opts.number_of_games);
         printf("Debug: %s\n", opts.debug ? "On" : "Off");
-        getch();
+        getchar();
     }
 
     game_t game;
@@ -180,6 +178,20 @@ void*(*commander_factory(enum commander commander_type))(void*) {
 }
 
 void print_usage(FILE* file, char* current_filename) {
+    fprintf(file, "Usage: %s [options]\n", current_filename);
+    fprintf(file, "Options:\n");
+    fprintf(file, "  -h                      Show this help message and exit\n");
+    fprintf(file, "  --mode <mode>           Set the game mode (default: default)\n");
+    fprintf(file, "                          Available modes: default, performance_statistics\n");
+    fprintf(file, "  --commander <commander> Set the commander type (default: player)\n");
+    fprintf(file, "                          Available commanders: player, fixed_toggle\n");
+    fprintf(file, "  --number_of_games <n>   Set the number of games to play (default: 1)\n");
+    fprintf(file, "                          Note: default mode only supports a single game\n");
+    fprintf(file, "                          Note: player commander only supports default mode\n");
+    fprintf(file, "                          Aliases: --games, -n\n");
+    fprintf(file, "  --debug                 Enable debug mode\n");
+
+
     fprintf(file, "Usage: %s [--mode <mode> --commander <commander> --number_of_games <n> --debug]\n", current_filename);
     fprintf(file, "Available modes: default, performance_statistics\n");
     fprintf(file, "Available commanders: player, fixed_toggle\n");
