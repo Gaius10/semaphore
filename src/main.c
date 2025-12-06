@@ -103,7 +103,7 @@ struct options parse_arguments(int argc, char* argv[]) {
         if (strcmp(argv[i], "--mode") == 0) {
             i++;
 
-            if (strcmp(argv[i], "performance_statistics") == 0) {
+            if (strcmp(argv[i], "performance_stats") == 0) {
                 opts.mode = MODE_PERFORMANCE_STATS;
                 continue;
             }
@@ -199,7 +199,7 @@ void print_usage(FILE* file, char* current_filename) {
     fprintf(file, "Options:\n");
     fprintf(file, "  -h                      Show this help message and exit\n");
     fprintf(file, "  --mode <mode>           Set the game mode (default: default)\n");
-    fprintf(file, "                          Available modes: default, performance_statistics\n");
+    fprintf(file, "                          Available modes: default, performance_stats\n");
     fprintf(file, "  --commander <commander> Set the commander type (default: player)\n");
     fprintf(file, "                          Available commanders: player, fixed_toggle\n");
     fprintf(file, "  --number_of_games <n>   Set the number of games to play (default: 1)\n");

@@ -25,9 +25,38 @@ void game_init(game_t* game) {
     tl_init(&game->traffic_light, 0, 0);
 
     game->status = GAME_RUNNING;
-    game->score = 0;
-    game->cycles_passed = 0;
+    game->stats = (struct stats) {
+        .cars_created = 0,
+        .cars_passed = 0,
+        .cycles_passed = 0,
+        .average_wait_cycles = 0
+    };
 }
+
+void game_update_stats(game_t* game) {
+    unsigned int cars_at_road_1 = game->road1.size;
+    unsigned int cars_at_road_2 = game->road2.size;
+    unsigned int total_cars = cars_at_road_1 + cars_at_road_2;
+
+    unsigned int total_wait_cycles = 0;
+    for (uint8_t i = 0; i < cars_at_road_1; i++) {
+        car_t* car = (car_t*)list_get(&game->road1, i);
+        total_wait_cycles += car->cycles_waited;
+    }
+
+    for (uint8_t i = 0; i < cars_at_road_2; i++) {
+        car_t* car = (car_t*)list_get(&game->road2, i);
+        total_wait_cycles += car->cycles_waited;
+    }
+
+    if (total_cars > 0) {
+        game->stats.average_wait_cycles = total_wait_cycles / total_cars;
+    }
+}
+
+/**
+ * Thread functions
+ */
 
 void* commander(void* arg) {
     game_t* game = (game_t*)arg;
@@ -84,13 +113,15 @@ void* car_factory(void* arg) {
                 break;
             case 1:
                 // push car to road 1
-                car_buffer = create_car(-10, 0);
+                car_buffer = car_create(-10, 0);
                 list_append(road1, car_buffer);
+                game->stats.cars_created++;
                 break;
             case 2:
                 // push car to road 2
-                car_buffer = create_car(0, -10);
+                car_buffer = car_create(0, -10);
                 list_append(road2, car_buffer);
+                game->stats.cars_created++;
                 break;
         }
 
@@ -124,23 +155,26 @@ void* car_mover(void* arg) {
             car_buffer = (car_t*)list_get(road1, i);
 
             if (some_car_at_position(road1, car_buffer->pos_x + 1, car_buffer->pos_y)) {
+                car_wait(car_buffer);
                 continue;
             }
 
             if (some_red_tl_at_position(tls, car_buffer->pos_x + 1, car_buffer->pos_y, ORIENTATION_HORIZONTAL)) {
+                car_wait(car_buffer);
                 continue;
             }
 
             if (some_green_tl_at_position(tls, car_buffer->pos_x + 1, car_buffer->pos_y, ORIENTATION_HORIZONTAL)) {
-                game->score++;
+                game->stats.cars_passed++;
             }
 
             car_buffer->pos_x += 1;
 
-            if (car_buffer->pos_x > 10) {
-                list_remove(road1, i);
-                i--;
-            }
+            // This would be for memmory saving, but it causes issues with stats calculation
+            // if (car_buffer->pos_x > 10) {
+            //     list_remove(road1, i);
+            //     i--;
+            // }
         }
 
         // Process road 2
@@ -148,26 +182,30 @@ void* car_mover(void* arg) {
             car_buffer = (car_t*)list_get(road2, i);
 
             if (some_car_at_position(road2, car_buffer->pos_x, car_buffer->pos_y + 1)) {
+                car_wait(car_buffer);
                 continue;
             }
 
             if (some_red_tl_at_position(tls, car_buffer->pos_x, car_buffer->pos_y + 1, ORIENTATION_VERTICAL)) {
+                car_wait(car_buffer);
                 continue;
             }
 
             if (some_green_tl_at_position(tls, car_buffer->pos_x, car_buffer->pos_y + 1, ORIENTATION_VERTICAL)) {
-                game->score++;
+                game->stats.cars_passed++;
             }
 
             car_buffer->pos_y += 1;
 
-            if (car_buffer->pos_y > 10) {
-                list_remove(road2, i);
-                i--;
-            }
+            // This would be for memmory saving, but it causes issues with stats calculation
+            // if (car_buffer->pos_y > 10) {
+            //     list_remove(road2, i);
+            //     i--;
+            // }
         }
 
-        game->cycles_passed++;
+        game->stats.cycles_passed++;
+        game_update_stats(game);
 
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);
@@ -237,7 +275,7 @@ void* world_renderer(void* arg) {
             game->traffic_light.v_state == TL_GREEN ? "GREEN" : "RED"
         );
 
-        printf("Score: %u | Cycles Passed: %u\n", game->score, game->cycles_passed);
+        printf("Cars Passed: %u | Cycles Passed: %u\n", game->stats.cars_passed, game->stats.cycles_passed);
 
         if (DEBUG) {
             for (uint8_t i = 0; i < road1->size; i++) {

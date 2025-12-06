@@ -13,7 +13,7 @@ void* ai_commander_fixed_toggle(void* arg) {
 
     while (game->status == GAME_RUNNING) {
         // Simple AI logic: toggle traffic lights every 5 cycles
-        if (game->cycles_passed % 5 == 0) {
+        if (game->stats.cycles_passed % 5 == 0) {
             tl_toggle_horizontal(&game->traffic_light);
             tl_toggle_vertical(&game->traffic_light);
         }

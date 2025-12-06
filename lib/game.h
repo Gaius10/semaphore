@@ -19,11 +19,21 @@ typedef struct game_t {
     sem_t road2_memmory;
     traffic_light_t traffic_light;
     uint8_t status;
-    unsigned int score; // Number of cars that have successfully passed the intersection
-    unsigned int cycles_passed;
+
+    struct stats {
+        unsigned int cars_created;
+        unsigned int cars_passed;
+        unsigned int average_wait_cycles;
+        unsigned int cycles_passed;
+    } stats;
 } game_t;
 
 void game_init(game_t* game);
+void game_update_stats(game_t* game);
+
+/**
+ * Thread functions
+ */
 
 void* commander(void* arg);
 
