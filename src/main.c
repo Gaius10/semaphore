@@ -31,20 +31,53 @@ struct options {
 void*(*commander_factory(enum commander commander_type))(void*);
 struct options parse_arguments(int argc, char* argv[]);
 void print_usage(FILE* file, char* current_filename);
-void run(struct options opts);
+game_t* run(struct options opts);
 
 int main(int argc, char *argv[]) {
     initTermios();
 
     struct options opts = parse_arguments(argc, argv);
-    run(opts);
+    game_t** games = malloc(sizeof(game_t*) * opts.number_of_games);
+
+    for (unsigned int i = 0; i < opts.number_of_games; i++) {
+        if (opts.mode == MODE_PERFORMANCE_STATS && !DEBUG) {
+            printf("Starting game %u of %u", i + 1, opts.number_of_games);
+            fflush(stdout);
+        }
+
+        games[i] = run(opts);
+
+        if (opts.mode == MODE_PERFORMANCE_STATS && !DEBUG) {
+            printf(" [DONE]\n");
+        }
+    }
+
+    if (opts.mode == MODE_PERFORMANCE_STATS) {
+        printf("\n=== Performance Statistics ===\n");
+        for (unsigned int i = 0; i < opts.number_of_games; i++) {
+            game_t* game = games[i];
+            printf("Game %u:\n", i + 1);
+            printf("  Cars Created: %u\n", game->stats.cars_created);
+            printf("  Cars Passed: %u\n", game->stats.cars_passed);
+            printf("  Cycles Passed: %u\n", game->stats.cycles_passed);
+            printf("  Average Wait Cycles: %u\n", game->stats.average_wait_cycles);
+            printf("\n");
+        }
+    }
 
     resetTermios();
+
+    // Freedom
+    for (unsigned int i = 0; i < opts.number_of_games; i++) {
+        free(games[i]);
+    }
+    free(games);
+
     return EXIT_SUCCESS;
 }
 
-void run(struct options opts) {
-    if (DEBUG) {
+game_t* run(struct options opts) {
+    if (DEBUG && opts.mode == MODE_DEFAULT) {
         printf("Starting game with the following options:\n");
         printf("Mode: %d\n", opts.mode);
         printf("Commander: %d\n", opts.commander);
@@ -52,7 +85,7 @@ void run(struct options opts) {
         getchar();
     }
 
-    game_t game;
+    game_t* game = malloc(sizeof(game_t));
 
     pthread_t car_factory_thread;
     pthread_t car_mover_thread;
@@ -60,15 +93,15 @@ void run(struct options opts) {
     pthread_t commander_thread;
     pthread_t game_state_thread;
 
-    game_init(&game);
+    game_init(game);
 
-    pthread_create(&car_factory_thread, NULL, car_factory, &game);
-    pthread_create(&car_mover_thread, NULL, car_mover, &game);
-    pthread_create(&game_state_thread, NULL, game_state_manager, &game);
-    pthread_create(&commander_thread, NULL, commander_factory(opts.commander), &game);
+    pthread_create(&car_factory_thread, NULL, car_factory, game);
+    pthread_create(&car_mover_thread, NULL, car_mover, game);
+    pthread_create(&game_state_thread, NULL, game_state_manager, game);
+    pthread_create(&commander_thread, NULL, commander_factory(opts.commander), game);
 
     if (opts.mode == MODE_DEFAULT) {
-        pthread_create(&world_renderer_thread, NULL, world_renderer, &game);
+        pthread_create(&world_renderer_thread, NULL, world_renderer, game);
     }
 
     pthread_join(car_factory_thread, NULL);
@@ -84,6 +117,8 @@ void run(struct options opts) {
     if (DEBUG) {
         printf("Game Over!\n");
     }
+
+    return game;
 }
 
 struct options parse_arguments(int argc, char* argv[]) {
