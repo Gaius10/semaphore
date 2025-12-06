@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
         run_performance_stats(opts);
     }
 
+    resetTermios();
     return EXIT_SUCCESS;
 }
 
@@ -60,45 +61,44 @@ void run_default(struct options opts) {
     free(game);
 }
 
+void* run_thread(void* arg) {
+    struct options opts = *(struct options*)arg;
+    return (void*) run(opts);
+}
+
 void run_performance_stats(struct options opts) {
     game_t** games = malloc(sizeof(game_t*) * opts.number_of_games);
+    pthread_t* threads = malloc(sizeof(pthread_t) * opts.number_of_games);
+    FILE* output_file = fopen("performance_stats.txt", "a+");
 
     for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        if (!DEBUG) {
-            printf("Starting game %u of %u", i + 1, opts.number_of_games);
-            fflush(stdout);
-        }
-
-        games[i] = run(opts);
-
-        if (!DEBUG) {
-            printf(" [DONE]\n");
-        }
+        pthread_create(&threads[i], NULL, run_thread, &opts);
     }
 
-    if (opts.mode == MODE_PERFORMANCE_STATS) {
-        printf("\n=== Performance Statistics ===\n");
-        for (unsigned int i = 0; i < opts.number_of_games; i++) {
-            game_t* game = games[i];
-            char* game_over_reason_strings[] = {
-                "N/A",
-                "Road Overflow",
-                "Collision"
-            };
-
-            printf("Game %u:\n", i + 1);
-            printf("  Cars Created: %u\n", game->stats.cars_created);
-            printf("  Cars Passed: %u\n", game->stats.cars_passed);
-            printf("  Cycles Passed: %u\n", game->stats.cycles_passed);
-            printf("  Average Wait Cycles: %u\n", game->stats.average_wait_cycles);
-            printf("  Game Over Reason: %s\n", game_over_reason_strings[game->stats.game_over_reason]);
-
-            printf("\n");
-        }
+    for (unsigned int i = 0; i < opts.number_of_games; i++) {
+        pthread_join(threads[i], (void**) &games[i]);
     }
 
-    resetTermios();
+    fprintf(output_file, "\n=== Performance Statistics ===\n");
+    for (unsigned int i = 0; i < opts.number_of_games; i++) {
+        game_t* game = games[i];
+        char* game_over_reason_strings[] = {
+            "N/A",
+            "Road Overflow",
+            "Collision"
+        };
 
+        fprintf(output_file, "Game %u:\n", i + 1);
+        fprintf(output_file, "  Cars Created: %u\n", game->stats.cars_created);
+        fprintf(output_file, "  Cars Passed: %u\n", game->stats.cars_passed);
+        fprintf(output_file, "  Cycles Passed: %u\n", game->stats.cycles_passed);
+        fprintf(output_file, "  Average Wait Cycles: %u\n", game->stats.average_wait_cycles);
+        fprintf(output_file, "  Game Over Reason: %s\n", game_over_reason_strings[game->stats.game_over_reason]);
+
+        fprintf(output_file, "\n");
+    }
+
+    fclose(output_file);
     // Freedom
     for (unsigned int i = 0; i < opts.number_of_games; i++) {
         free(games[i]);
