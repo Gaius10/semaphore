@@ -12,6 +12,12 @@
 #define GAME_RUNNING 1
 #define GAME_OVER 0
 
+enum game_over_reason {
+    GAME_OVER_NONE,
+    GAME_OVER_ROAD_OVERFLOW,
+    GAME_OVER_COLLISION
+};
+
 typedef struct game_t {
     list_t road1;
     list_t road2;
@@ -25,6 +31,7 @@ typedef struct game_t {
         unsigned int cars_passed;
         unsigned int average_wait_cycles;
         unsigned int cycles_passed;
+        enum game_over_reason game_over_reason;
     } stats;
 } game_t;
 

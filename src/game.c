@@ -314,6 +314,7 @@ void* game_state_manager(void* arg) {
             }
 
             game->status = GAME_OVER;
+            game->stats.game_over_reason = GAME_OVER_ROAD_OVERFLOW;
             break;
         }
 
@@ -324,6 +325,7 @@ void* game_state_manager(void* arg) {
             }
 
             game->status = GAME_OVER;
+            game->stats.game_over_reason = GAME_OVER_COLLISION;
             break;
         }
     }

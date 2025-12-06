@@ -33,21 +33,45 @@ struct options parse_arguments(int argc, char* argv[]);
 void print_usage(FILE* file, char* current_filename);
 game_t* run(struct options opts);
 
+/**
+ * For readability purposes, one function for each mode
+ */
+void run_default(struct options opts);
+void run_performance_stats(struct options opts);
+
 int main(int argc, char *argv[]) {
     initTermios();
 
     struct options opts = parse_arguments(argc, argv);
+
+    if (opts.mode == MODE_DEFAULT) {
+        run_default(opts);
+    }
+
+    if (opts.mode == MODE_PERFORMANCE_STATS) {
+        run_performance_stats(opts);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+void run_default(struct options opts) {
+    game_t* game = run(opts);
+    free(game);
+}
+
+void run_performance_stats(struct options opts) {
     game_t** games = malloc(sizeof(game_t*) * opts.number_of_games);
 
     for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        if (opts.mode == MODE_PERFORMANCE_STATS && !DEBUG) {
+        if (!DEBUG) {
             printf("Starting game %u of %u", i + 1, opts.number_of_games);
             fflush(stdout);
         }
 
         games[i] = run(opts);
 
-        if (opts.mode == MODE_PERFORMANCE_STATS && !DEBUG) {
+        if (!DEBUG) {
             printf(" [DONE]\n");
         }
     }
@@ -56,11 +80,19 @@ int main(int argc, char *argv[]) {
         printf("\n=== Performance Statistics ===\n");
         for (unsigned int i = 0; i < opts.number_of_games; i++) {
             game_t* game = games[i];
+            char* game_over_reason_strings[] = {
+                "N/A",
+                "Road Overflow",
+                "Collision"
+            };
+
             printf("Game %u:\n", i + 1);
             printf("  Cars Created: %u\n", game->stats.cars_created);
             printf("  Cars Passed: %u\n", game->stats.cars_passed);
             printf("  Cycles Passed: %u\n", game->stats.cycles_passed);
             printf("  Average Wait Cycles: %u\n", game->stats.average_wait_cycles);
+            printf("  Game Over Reason: %s\n", game_over_reason_strings[game->stats.game_over_reason]);
+
             printf("\n");
         }
     }
@@ -72,8 +104,6 @@ int main(int argc, char *argv[]) {
         free(games[i]);
     }
     free(games);
-
-    return EXIT_SUCCESS;
 }
 
 game_t* run(struct options opts) {
