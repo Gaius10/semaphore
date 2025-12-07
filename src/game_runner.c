@@ -66,9 +66,10 @@ void run_performance_stats(struct options opts) {
     for (unsigned i = 0; i < opts.number_of_games; i++) {
         gamebag_init(&gamebags[i], opts);
 
-        while (count_running_games(gamebags, opts) >= 3) {
-            sched_yield();
-        }
+        // This would limit number of running games at a time
+        // while (count_running_games(gamebags, opts) >= 3) {
+        //     sched_yield();
+        // }
     }
 
     // Syncronize threads
