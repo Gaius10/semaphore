@@ -14,7 +14,7 @@ void list_init(list_t* list);
 
 void list_append(list_t* list, car_t* car);
 void list_remove(list_t* list, int index);
-void list_destroy(list_t* list);
+void list_destroy(list_t** list);
 
 car_t* list_get(list_t* list, int index);
 

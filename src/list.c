@@ -5,6 +5,10 @@
 #include "../lib/car.h"
 
 void list_init(list_t* list) {
+    for (unsigned i = 0; i < LIST_MAX_SIZE; i++) {
+        list->items[i] = NULL;
+    }
+
     list->size = 0;
 }
 
@@ -31,12 +35,14 @@ void list_remove(list_t* list, int index) {
     list->size--;
 }
 
-void list_destroy(list_t* list) {
-    for (int i = 0; i < list->size; i++) {
-        car_destroy(list->items[i]);
+void list_destroy(list_t** list) {
+    for (int i = 0; i < (*list)->size; i++) {
+        car_destroy((*list)->items[i]);
     }
 
-    free(list);
+    (*list)->size = 0;
+    free(*list);
+    *list = NULL;
 }
 
 car_t* list_get(list_t* list, int index) {

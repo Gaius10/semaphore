@@ -48,7 +48,7 @@ void* car_factory(void* arg);
 void* car_mover(void* arg);
 
 void* world_renderer(void* arg);
-void* world_renderer_debugger(void* arg);
+void* world_renderer_mock(void* arg);
 
 void* game_state_manager(void* arg);
 

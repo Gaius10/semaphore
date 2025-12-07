@@ -1,43 +1,19 @@
 // Caio Corrêa Chaves - 15444406
 // Gustavo Henrique Nogueira de Andrade Filho - 16871388
+
 #include "../lib/config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
-#include <semaphore.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdbool.h>
 
-#include "../lib/game.h"
-#include "../lib/ai.h"
 #include "../lib/input.h"
+#include "../lib/game_runner.h"
 
-struct options {
-    enum mode {
-        MODE_DEFAULT,
-        MODE_PERFORMANCE_STATS
-    } mode;
-
-    enum commander {
-        COMMANDER_PLAYER,
-        COMMANDER_FIXED_TOGGLE,
-    } commander;
-
-    unsigned int number_of_games;
-};
-
-void*(*commander_factory(enum commander commander_type))(void*);
 struct options parse_arguments(int argc, char* argv[]);
 void print_usage(FILE* file, char* current_filename);
-game_t* run(struct options opts);
-
-/**
- * For readability purposes, one function for each mode
- */
-void run_default(struct options opts);
-void run_performance_stats(struct options opts);
 
 int main(int argc, char *argv[]) {
     initTermios();
@@ -54,101 +30,6 @@ int main(int argc, char *argv[]) {
 
     resetTermios();
     return EXIT_SUCCESS;
-}
-
-void run_default(struct options opts) {
-    game_t* game = run(opts);
-    free(game);
-}
-
-void* run_thread(void* arg) {
-    struct options opts = *(struct options*)arg;
-    return (void*) run(opts);
-}
-
-void run_performance_stats(struct options opts) {
-    game_t** games = malloc(sizeof(game_t*) * opts.number_of_games);
-    pthread_t* threads = malloc(sizeof(pthread_t) * opts.number_of_games);
-    FILE* output_file = fopen("performance_stats.txt", "a+");
-
-    for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        pthread_create(&threads[i], NULL, run_thread, &opts);
-    }
-
-    for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        pthread_join(threads[i], (void**) &games[i]);
-    }
-
-    fprintf(output_file, "\n=== Performance Statistics ===\n");
-    for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        game_t* game = games[i];
-        char* game_over_reason_strings[] = {
-            "N/A",
-            "Road Overflow",
-            "Collision"
-        };
-
-        fprintf(output_file, "Game %u:\n", i + 1);
-        fprintf(output_file, "  Cars Created: %u\n", game->stats.cars_created);
-        fprintf(output_file, "  Cars Passed: %u\n", game->stats.cars_passed);
-        fprintf(output_file, "  Cycles Passed: %u\n", game->stats.cycles_passed);
-        fprintf(output_file, "  Average Wait Cycles: %u\n", game->stats.average_wait_cycles);
-        fprintf(output_file, "  Game Over Reason: %s\n", game_over_reason_strings[game->stats.game_over_reason]);
-
-        fprintf(output_file, "\n");
-    }
-
-    fclose(output_file);
-    // Freedom
-    for (unsigned int i = 0; i < opts.number_of_games; i++) {
-        free(games[i]);
-    }
-    free(games);
-}
-
-game_t* run(struct options opts) {
-    if (DEBUG && opts.mode == MODE_DEFAULT) {
-        printf("Starting game with the following options:\n");
-        printf("Mode: %d\n", opts.mode);
-        printf("Commander: %d\n", opts.commander);
-        printf("Number of games: %u\n", opts.number_of_games);
-        getchar();
-    }
-
-    game_t* game = malloc(sizeof(game_t));
-
-    pthread_t car_factory_thread;
-    pthread_t car_mover_thread;
-    pthread_t world_renderer_thread;
-    pthread_t commander_thread;
-    pthread_t game_state_thread;
-
-    game_init(game);
-
-    pthread_create(&car_factory_thread, NULL, car_factory, game);
-    pthread_create(&car_mover_thread, NULL, car_mover, game);
-    pthread_create(&game_state_thread, NULL, game_state_manager, game);
-    pthread_create(&commander_thread, NULL, commander_factory(opts.commander), game);
-
-    if (opts.mode == MODE_DEFAULT) {
-        pthread_create(&world_renderer_thread, NULL, world_renderer, game);
-    }
-
-    pthread_join(car_factory_thread, NULL);
-    pthread_join(car_mover_thread, NULL);
-    pthread_join(game_state_thread, NULL);
-
-    if (opts.mode == MODE_DEFAULT) {
-        pthread_join(world_renderer_thread, NULL);
-    }
-
-    pthread_cancel(commander_thread);
-
-    if (DEBUG) {
-        printf("Game Over!\n");
-    }
-
-    return game;
 }
 
 struct options parse_arguments(int argc, char* argv[]) {
@@ -246,29 +127,16 @@ struct options parse_arguments(int argc, char* argv[]) {
     return opts;
 }
 
-void*(*commander_factory(enum commander commander_type))(void*) {
-    if (commander_type == COMMANDER_PLAYER) {
-        return commander;
-    }
-
-    if (commander_type == COMMANDER_FIXED_TOGGLE) {
-        return ai_commander_fixed_toggle;
-    }
-
-    fprintf(stderr, "Error: failed to load commander.\n");
-    exit(EXIT_FAILURE);
-}
-
 void print_usage(FILE* file, char* current_filename) {
     fprintf(file, "Usage: %s [options]\n", current_filename);
     fprintf(file, "Options:\n");
     fprintf(file, "  -h                      Show this help message and exit\n");
     fprintf(file, "  --mode <mode>           Set the game mode (default: default)\n");
-    fprintf(file, "                          Available modes: default, performance_stats\n");
+    fprintf(file, "                            Available modes: default, performance_stats\n");
     fprintf(file, "  --commander <commander> Set the commander type (default: player)\n");
-    fprintf(file, "                          Available commanders: player, fixed_toggle\n");
+    fprintf(file, "                            Available commanders: player, fixed_toggle\n");
     fprintf(file, "  --number_of_games <n>   Set the number of games to play (default: 1)\n");
-    fprintf(file, "                          Note: default mode only supports a single game\n");
-    fprintf(file, "                          Note: player commander only supports default mode\n");
-    fprintf(file, "                          Aliases: --games, -n\n");
+    fprintf(file, "                            Note: default mode only supports a single game\n");
+    fprintf(file, "                            Note: player commander only supports default mode\n");
+    fprintf(file, "                            Aliases: --games, -n\n");
 }

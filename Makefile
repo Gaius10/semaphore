@@ -11,6 +11,7 @@ OBJS    := \
 	build/input.o \
 	build/traffic_light.o \
 	build/game_utils.o \
+	build/game_runner.o \
 	build/ai.o
 
 .PHONY: all clean run
@@ -20,7 +21,7 @@ all: $(TARGET)
 $(TARGET): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@ $(LDLIBS)
 
-build/%.o: src/%.c lib/game.h lib/car.h lib/list.h lib/input.h lib/traffic_light.h lib/game_utils.h lib/ai.h lib/config.h
+build/%.o: src/%.c lib/game.h lib/car.h lib/list.h lib/input.h lib/traffic_light.h lib/game_utils.h lib/ai.h lib/config.h lib/game_runner.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 run: $(TARGET)

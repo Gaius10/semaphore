@@ -220,6 +220,10 @@ void* car_mover(void* arg) {
     return NULL;
 }
 
+void* world_renderer_mock(void* arg) {
+    // Do nothing
+}
+
 void* world_renderer(void* arg) {
     game_t* game = (game_t*)arg;
 
