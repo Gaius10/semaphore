@@ -326,6 +326,9 @@ void* game_state_manager(void* arg) {
 
     game->status = GAME_RUNNING;
     while (game->status == GAME_RUNNING) {
+        sem_wait(&game->road1_memmory);
+        sem_wait(&game->road2_memmory);
+
         // Check for road overflow
         uint8_t waiting_at_road1 = count_cars_waiting(&game->road1, &game->traffic_light, ORIENTATION_HORIZONTAL);
         uint8_t waiting_at_road2 = count_cars_waiting(&game->road2, &game->traffic_light, ORIENTATION_VERTICAL);
@@ -337,6 +340,9 @@ void* game_state_manager(void* arg) {
 
             game->status = GAME_OVER;
             game->stats.game_over_reason = GAME_OVER_ROAD_OVERFLOW;
+
+            sem_post(&game->road1_memmory);
+            sem_post(&game->road2_memmory);
             break;
         }
 
@@ -348,8 +354,14 @@ void* game_state_manager(void* arg) {
 
             game->status = GAME_OVER;
             game->stats.game_over_reason = GAME_OVER_COLLISION;
+
+            sem_post(&game->road1_memmory);
+            sem_post(&game->road2_memmory);
             break;
         }
+
+        sem_post(&game->road1_memmory);
+        sem_post(&game->road2_memmory);
     }
 
     if (DEBUG) {
