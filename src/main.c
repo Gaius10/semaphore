@@ -71,6 +71,11 @@ struct options parse_arguments(int argc, char* argv[]) {
                 continue;
             }
 
+            if (strcmp(argv[i], "random_toggle") == 0) {
+                opts.commander = COMMANDER_RANDOM_TOGGLE;
+                continue;
+            }
+
             if (strcmp(argv[i], "player") != 0) {
                 fprintf(stderr, "Error: invalid commander: %s\n", argv[i]);
                 resetTermios();

@@ -186,6 +186,10 @@ void*(*commander_factory(enum commander commander_type))(void*) {
         return ai_commander_fixed_toggle;
     }
 
+    if (commander_type == COMMANDER_RANDOM_TOGGLE) {
+        return ai_commander_random_toggle;
+    }
+
     return commander;
 }
 
