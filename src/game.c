@@ -24,8 +24,8 @@ void game_init(game_t* game) {
 
     tl_init(&game->traffic_light, 0, 0);
 
-    game->status = GAME_RUNNING;
-    game->stats = (struct stats) {
+    game->status = GAME_WAITING;
+    game->stats = (struct game_stats) {
         .cars_created = 0,
         .cars_passed = 0,
         .cycles_passed = 0,
@@ -65,6 +65,10 @@ void* commander(void* arg) {
 
     char command;
 
+    while (game->status == GAME_WAITING) {
+        sched_yield();
+    }
+
     while (game->status == GAME_RUNNING) {
         command = getchar();
         switch (command) {
@@ -98,6 +102,10 @@ void* car_factory(void* arg) {
     list_t *road2 = &game->road2; // vertical
 
     car_t* car_buffer = NULL;
+
+    while (game->status == GAME_WAITING) {
+        sched_yield();
+    }
 
     while (game->status == GAME_RUNNING) {
         nanosleep(&ts_sleep, NULL);
@@ -145,6 +153,10 @@ void* car_mover(void* arg) {
     car_t* car_buffer = NULL;
 
     traffic_light_t* tls[] = {&game->traffic_light};
+
+    while (game->status == GAME_WAITING) {
+        sched_yield();
+    }
 
     while (game->status == GAME_RUNNING) {
         sem_wait(&game->road1_memmory);
@@ -222,6 +234,7 @@ void* car_mover(void* arg) {
 
 void* world_renderer_mock(void* arg) {
     // Do nothing
+    return NULL;
 }
 
 void* world_renderer(void* arg) {
@@ -231,6 +244,10 @@ void* world_renderer(void* arg) {
     list_t *road2 = &game->road2; // vertical
 
     car_t* car_buffer = NULL;
+
+    while (game->status == GAME_WAITING) {
+        sched_yield();
+    }
 
     while (game->status == GAME_RUNNING) {
         system("clear");
@@ -307,6 +324,7 @@ void* world_renderer(void* arg) {
 void* game_state_manager(void* arg) {
     game_t* game = (game_t*)arg;
 
+    game->status = GAME_RUNNING;
     while (game->status == GAME_RUNNING) {
         // Check for road overflow
         uint8_t waiting_at_road1 = count_cars_waiting(&game->road1, &game->traffic_light, ORIENTATION_HORIZONTAL);

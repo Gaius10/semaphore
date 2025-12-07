@@ -9,8 +9,11 @@
 #include "list.h"
 #include "traffic_light.h"
 
-#define GAME_RUNNING 1
-#define GAME_OVER 0
+enum game_status {
+    GAME_WAITING,
+    GAME_RUNNING,
+    GAME_OVER
+};
 
 enum game_over_reason {
     GAME_OVER_NONE,
@@ -24,9 +27,9 @@ typedef struct game_t {
     sem_t road1_memmory;
     sem_t road2_memmory;
     traffic_light_t traffic_light;
-    uint8_t status;
+    enum game_status status;
 
-    struct stats {
+    struct game_stats {
         unsigned int cars_created;
         unsigned int cars_passed;
         unsigned int average_wait_cycles;

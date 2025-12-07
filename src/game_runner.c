@@ -69,20 +69,27 @@ void run_performance_stats(struct options opts) {
     pthread_join(observer_thread, NULL);
 
     // Output stats
-    fprintf(output_file, "game_id,cars_created,cars_passed,average_wait_cycles,cycles_passed,game_over_reason\n");
+    fprintf(output_file, "game_id,cars_created,cars_passed,average_wait_cycles,cycles_passed,final_status,game_over_reason\n");
     char* reason_phrase[] = {
         "N/A",
         "Road Overflow",
         "Collision"
     };
 
+    char* status_phrase[] = {
+        "Waiting",
+        "Running",
+        "Game Over"
+    };
+
     for (unsigned i = 0; i < opts.number_of_games; i++) {
-        fprintf(output_file, "%u,%u,%u,%u,%u,%s\n",
+        fprintf(output_file, "%u,%u,%u,%u,%u,%s,%s\n",
             i + 1,
             gamebags[i].game.stats.cars_created,
             gamebags[i].game.stats.cars_passed,
             gamebags[i].game.stats.average_wait_cycles,
             gamebags[i].game.stats.cycles_passed,
+            status_phrase[gamebags[i].game.status],
             reason_phrase[gamebags[i].game.stats.game_over_reason]
         );
     }
@@ -99,6 +106,12 @@ void* performance_observer(void* args) {
         "Collision"
     };
 
+    char* status_phrase[] = {
+        "Waiting",
+        "Running",
+        "Game Over"
+    };
+
     do {
         nanosleep(&(struct timespec){0, 1000 * 1000 * 100}, NULL);
         system("clear");
@@ -112,7 +125,7 @@ void* performance_observer(void* args) {
 
             printf("Game %u: Status: %s | Cars Created: %u | Cars Passed: %u | Average Wait Cycles: %u | Cycles Passed: %u | Game Over Reason: %s\n",
                 i + 1,
-                gamebags[i].game.status == GAME_RUNNING ? "Running" : "Game Over",
+                status_phrase[gamebags[i].game.status],
                 gamebags[i].game.stats.cars_created,
                 gamebags[i].game.stats.cars_passed,
                 gamebags[i].game.stats.average_wait_cycles,
