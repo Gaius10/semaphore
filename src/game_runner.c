@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "../lib/game.h"
 #include "../lib/game_runner.h"
@@ -17,6 +18,11 @@ typedef struct gamebag {
     pthread_t commander_thread;
     pthread_t state_manager_thread;
 } gamebag_t;
+
+typedef struct observer_args {
+    gamebag_t* gamebags;
+    struct options opts;
+} observer_args_t;
 
 void gamebag_init(gamebag_t* gamebag, struct options opts);
 void gamebag_join(gamebag_t* gamebag);
@@ -38,8 +44,85 @@ void run_default(struct options opts) {
     free(gamebag);
 }
 
+void* performance_observer(void* args);
 void run_performance_stats(struct options opts) {
-    printf("Running in performance_stats mode.\n"); // @todo
+    FILE* output_file = fopen("performance_stats.csv", "w");
+
+    gamebag_t* gamebags = malloc(sizeof(gamebag_t) * opts.number_of_games);
+
+    pthread_t observer_thread;
+    observer_args_t observer_args = {
+        .gamebags = gamebags,
+        .opts = opts
+    };
+
+    // Start games
+    pthread_create(&observer_thread, NULL, performance_observer, &observer_args);
+    for (unsigned i = 0; i < opts.number_of_games; i++) {
+        gamebag_init(&gamebags[i], opts);
+    }
+
+    // Wait game over
+    for (unsigned i = 0; i < opts.number_of_games; i++) {
+        gamebag_join(&gamebags[i]);
+    }
+    pthread_join(observer_thread, NULL);
+
+    // Output stats
+    fprintf(output_file, "game_id,cars_created,cars_passed,average_wait_cycles,cycles_passed,game_over_reason\n");
+    char* reason_phrase[] = {
+        "N/A",
+        "Road Overflow",
+        "Collision"
+    };
+
+    for (unsigned i = 0; i < opts.number_of_games; i++) {
+        fprintf(output_file, "%u,%u,%u,%u,%u,%s\n",
+            i + 1,
+            gamebags[i].game.stats.cars_created,
+            gamebags[i].game.stats.cars_passed,
+            gamebags[i].game.stats.average_wait_cycles,
+            gamebags[i].game.stats.cycles_passed,
+            reason_phrase[gamebags[i].game.stats.game_over_reason]
+        );
+    }
+}
+
+void* performance_observer(void* args) {
+    gamebag_t* gamebags = ((observer_args_t*)args)->gamebags;
+    struct options opts = ((observer_args_t*)args)->opts;
+
+    bool some_game_running;
+    char* reason_phrase[] = {
+        "N/A",
+        "Road Overflow",
+        "Collision"
+    };
+
+    do {
+        nanosleep(&(struct timespec){0, 1000 * 1000 * 100}, NULL);
+        system("clear");
+
+        some_game_running = false;
+
+        for (unsigned i = 0; i < opts.number_of_games; i++) {
+            if (gamebags[i].game.status == GAME_RUNNING) {
+                some_game_running = true;
+            }
+
+            printf("Game %u: Status: %s | Cars Created: %u | Cars Passed: %u | Average Wait Cycles: %u | Cycles Passed: %u | Game Over Reason: %s\n",
+                i + 1,
+                gamebags[i].game.status == GAME_RUNNING ? "Running" : "Game Over",
+                gamebags[i].game.stats.cars_created,
+                gamebags[i].game.stats.cars_passed,
+                gamebags[i].game.stats.average_wait_cycles,
+                gamebags[i].game.stats.cycles_passed,
+                reason_phrase[gamebags[i].game.stats.game_over_reason]
+            );
+        }
+    } while (some_game_running);
+
+    return NULL;
 }
 
 void*(*renderer_factory(enum mode game_mode))(void*);
