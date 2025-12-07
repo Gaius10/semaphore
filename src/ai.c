@@ -43,6 +43,11 @@ void* ai_commander_random_toggle(void* arg) {
     }
 
     while (game->status == GAME_RUNNING) {
+        if (game->stats.cycles_passed % 4 != 0) {
+            wait();
+            continue;
+        }
+
         int random_number = rand();
 
         if (random_number % 2 == 0) {
