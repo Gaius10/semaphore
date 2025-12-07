@@ -45,10 +45,15 @@ void run_default(struct options opts) {
 }
 
 void* performance_observer(void* args);
+uint8_t count_running_games(gamebag_t* gamebags, struct options opts);
+
 void run_performance_stats(struct options opts) {
     FILE* output_file = fopen("performance_stats.csv", "w");
 
     gamebag_t* gamebags = malloc(sizeof(gamebag_t) * opts.number_of_games);
+    for (unsigned i = 0; i < opts.number_of_games; i++) {
+        game_init(&gamebags[i].game);
+    }
 
     pthread_t observer_thread;
     observer_args_t observer_args = {
@@ -60,9 +65,13 @@ void run_performance_stats(struct options opts) {
     pthread_create(&observer_thread, NULL, performance_observer, &observer_args);
     for (unsigned i = 0; i < opts.number_of_games; i++) {
         gamebag_init(&gamebags[i], opts);
+
+        while (count_running_games(gamebags, opts) >= 3) {
+            sched_yield();
+        }
     }
 
-    // Wait game over
+    // Syncronize threads
     for (unsigned i = 0; i < opts.number_of_games; i++) {
         gamebag_join(&gamebags[i]);
     }
@@ -136,6 +145,18 @@ void* performance_observer(void* args) {
     } while (some_game_running);
 
     return NULL;
+}
+
+uint8_t count_running_games(gamebag_t* gamebags, struct options opts) {
+    uint8_t count = 0;
+
+    for (unsigned i = 0; i < opts.number_of_games; i++) {
+        if (gamebags[i].game.status == GAME_RUNNING) {
+            count++;
+        }
+    }
+
+    return count;
 }
 
 void*(*renderer_factory(enum mode game_mode))(void*);
