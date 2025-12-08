@@ -4,20 +4,9 @@
 #include <string.h>
 
 #define populacao 10
-#define tam_genetico 8
+#define tam_genetico 4
 #define geracoes 45
 
-char vert_liga(int avaliado[], int var[]) {
-    int vertical = avaliado[0] * (var[0]- avaliado[1]) + avaliado[2] * var[1] + avaliado[3] * var[2];
-    if (vertical >= 0) return 'v';
-    return 'n';
-}
-
-char hori_liga(int avaliado[], int var[]){ 
-    int vertical = avaliado[4] * (var[0]- avaliado[5]) + avaliado[6] * var[1] + avaliado[7] * var[2];
-    if (vertical >= 0) return 'h';
-    return 'n';
-}
 
 void genocidio(int pais[][tam_genetico]) {
     for (int i = 0; i < populacao; i++) {
