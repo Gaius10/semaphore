@@ -45,14 +45,64 @@ void run_default(struct options opts) {
     free(gamebag);
 }
 
+void population_init(double* population, unsigned len, double* champion);
+
 // public
 void run_training(struct options opts) {
-    printf("Running in training mode.\n");
-    printf("Starting game with the following options:\n");
-    printf("Mode: %d\n", opts.mode);
-    printf("Commander: %d\n", opts.commander);
-    printf("Number of games: %u\n", opts.number_of_games);
-    getchar();
+    FILE* champions_file = fopen("training/champions.csv", "a+");
+
+    fseek(champions_file, 0L, SEEK_END);
+    long int fpos = ftell(champions_file);
+    double* champion = NULL;
+    double* population = malloc(sizeof(double) * 4 * TRAINING_POPULATION_LEN);
+
+    if (population == NULL) {
+        fprintf(stderr, "Error allocating memmory for population.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // No champion registered
+    if (fpos > 55) {
+        // goes to start of last line
+        while (fgetc(champions_file) != '\n') {
+            fseek(champions_file, --fpos, SEEK_SET);
+        }
+
+        champion = malloc(sizeof(double) * 4);
+        if (
+            champion == NULL ||
+            fscanf(
+                champions_file,
+                "%*u,%lf,%lf,%lf,%lf",
+                champion + 0,
+                champion + 1,
+                champion + 2,
+                champion + 3
+            ) != 4
+        ) {
+            fprintf(stderr, "Error reading last champion.\n");
+            exit(EXIT_FAILURE);
+        }
+
+        printf(
+            "Read champion: %lf %lf %lf %lf\n",
+            *(champion + 0),
+            *(champion + 1),
+            *(champion + 2),
+            *(champion + 3)
+        );
+    } else {
+        printf("No champion.\n");
+    }
+
+
+    fclose(champions_file);
+    // Initialize population
+    // * Test each specimen
+    // Save the better
+    // Kill everyone
+    // Mutate champion (generate new population)
+    // goto *
 }
 
 void* performance_observer(void* args);
