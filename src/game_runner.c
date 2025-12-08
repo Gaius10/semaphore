@@ -8,7 +8,7 @@
 
 #include "../lib/game.h"
 #include "../lib/game_runner.h"
-#include "../lib/ai.h"
+#include "../lib/ai_commanders.h"
 
 typedef struct gamebag {
     game_t game;
@@ -27,6 +27,7 @@ typedef struct observer_args {
 void gamebag_init(gamebag_t* gamebag, struct options opts);
 void gamebag_join(gamebag_t* gamebag);
 
+// public
 void run_default(struct options opts) {
     if (DEBUG) {
         printf("Starting game with the following options:\n");
@@ -44,9 +45,20 @@ void run_default(struct options opts) {
     free(gamebag);
 }
 
+// public
+void run_training(struct options opts) {
+    printf("Running in training mode.\n");
+    printf("Starting game with the following options:\n");
+    printf("Mode: %d\n", opts.mode);
+    printf("Commander: %d\n", opts.commander);
+    printf("Number of games: %u\n", opts.number_of_games);
+    getchar();
+}
+
 void* performance_observer(void* args);
 uint8_t count_running_games(gamebag_t* gamebags, struct options opts);
 
+// public
 void run_performance_stats(struct options opts) {
     FILE* output_file = fopen("performance_stats.csv", "w");
 
@@ -189,6 +201,10 @@ void*(*commander_factory(enum commander commander_type))(void*) {
 
     if (commander_type == COMMANDER_RANDOM_TOGGLE) {
         return ai_commander_random_toggle;
+    }
+
+    if (commander_type == COMMANDER_SPECIMEN_MODEL_01) {
+        return ai_commander_specimen_model_01;
     }
 
     return commander;

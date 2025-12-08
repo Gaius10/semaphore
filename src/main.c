@@ -28,6 +28,10 @@ int main(int argc, char *argv[]) {
         run_performance_stats(opts);
     }
 
+    if (opts.mode == MODE_TRAINING) {
+        run_training(opts);
+    }
+
     resetTermios();
     return EXIT_SUCCESS;
 }
@@ -37,6 +41,13 @@ struct options parse_arguments(int argc, char* argv[]) {
         .mode = MODE_DEFAULT,
         .commander = COMMANDER_PLAYER,
         .number_of_games = 1,
+    };
+
+    char* commander_phrases[] = {
+        "Player",
+        "Fixed Toggle",
+        "Random Toggle",
+        "Specimen Model 01",
     };
 
     for (uint8_t i = 1; i < argc; i++) {
@@ -51,6 +62,11 @@ struct options parse_arguments(int argc, char* argv[]) {
 
             if (strcmp(argv[i], "performance_stats") == 0) {
                 opts.mode = MODE_PERFORMANCE_STATS;
+                continue;
+            }
+
+            if (strcmp(argv[i], "training") == 0) {
+                opts.mode = MODE_TRAINING;
                 continue;
             }
 
@@ -73,6 +89,11 @@ struct options parse_arguments(int argc, char* argv[]) {
 
             if (strcmp(argv[i], "random_toggle") == 0) {
                 opts.commander = COMMANDER_RANDOM_TOGGLE;
+                continue;
+            }
+
+            if (strcmp(argv[i], "specimen_model_01") == 0) {
+                opts.commander = COMMANDER_SPECIMEN_MODEL_01;
                 continue;
             }
 
@@ -129,6 +150,19 @@ struct options parse_arguments(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    if (
+        opts.mode == MODE_TRAINING && (
+            opts.commander == COMMANDER_FIXED_TOGGLE ||
+            opts.commander == COMMANDER_PLAYER ||
+            opts.commander == COMMANDER_RANDOM_TOGGLE
+        )
+    ) {
+        fprintf(stderr, "Error: commander %s is not trainable.\n", commander_phrases[opts.commander]);
+        print_usage(stderr, argv[0]);
+        resetTermios();
+        exit(EXIT_FAILURE);
+    }
+
     return opts;
 }
 
@@ -137,11 +171,12 @@ void print_usage(FILE* file, char* current_filename) {
     fprintf(file, "Options:\n");
     fprintf(file, "  -h                      Show this help message and exit\n");
     fprintf(file, "  --mode <mode>           Set the game mode (default: default)\n");
-    fprintf(file, "                            Available modes: default, performance_stats\n");
+    fprintf(file, "                            Available modes: default, performance_stats, training\n");
     fprintf(file, "  --commander <commander> Set the commander type (default: player)\n");
-    fprintf(file, "                            Available commanders: player, fixed_toggle\n");
+    fprintf(file, "                            Available commanders: player, fixed_toggle, random_toggle, specimen_model_01\n");
     fprintf(file, "  --number_of_games <n>   Set the number of games to play (default: 1)\n");
     fprintf(file, "                            Note: default mode only supports a single game\n");
     fprintf(file, "                            Note: player commander only supports default mode\n");
+    fprintf(file, "                            Note: training mode only works with specimen commanders\n");
     fprintf(file, "                            Aliases: --games, -n\n");
 }
