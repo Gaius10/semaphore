@@ -132,7 +132,7 @@ void apply_signals(traffic_light_t* tl, bool horizontal, bool vertical) {
     }
 
     while (vertical != tl->v_state) {
-        tl_toggle_horizontal(tl);
+        tl_toggle_vertical(tl);
     }
 }
 
