@@ -76,12 +76,12 @@ void* ai_commander_specimen_model_01(void* arg) {
     bool signal_horizontal;
     bool signal_vertical;
 
-    double road1_a, road1_b;
-    double road2_a, road2_b;
+    double road1_a, road1_b, road1_c;
+    double road2_a, road2_b, road2_c;
 
     FILE* model_file = fopen("model.cfg", "r");
 
-    if (fscanf(model_file, "%lf %lf %lf %lf", &road1_a, &road1_b, &road2_a, &road2_b) != 4) {
+    if (fscanf(model_file, "%lf %lf %lf %lf %lf %lf", &road1_a, &road1_b, &road1_c, &road2_a, &road2_b, &road2_c) != 6) {
         fprintf(stderr, "Error reading model file.\n");
         exit(EXIT_FAILURE);
     }
@@ -92,20 +92,17 @@ void* ai_commander_specimen_model_01(void* arg) {
         sched_yield();
     }
 
-    FILE* output_file = fopen("output.txt", "w");
     while (game->status == GAME_RUNNING) {
         avg_distance1 = avg_origin_distance(&game->road1);
         avg_distance2 = avg_origin_distance(&game->road2);
 
-        signal_horizontal = fmod(road1_a * avg_distance1 + road1_b * avg_distance2, 100) > 50;
-        signal_vertical = fmod(road2_a * avg_distance1 + road2_b * avg_distance2, 100) > 50;
+        signal_horizontal = fmod(road1_a + road1_b * avg_distance1 + road1_c * avg_distance2, 100) > 50;
+        signal_vertical = fmod(road2_a + road2_b * avg_distance1 + road2_c * avg_distance2, 100) > 50;
 
         apply_signals(&game->traffic_light, signal_horizontal, signal_vertical);
 
-        fprintf(output_file, "Cicles passed: %u | Signals: %u %u\n", game->stats.cycles_passed, signal_horizontal, signal_vertical);
         wait();
     }
-    fclose(output_file);
 
     return NULL;
 }
