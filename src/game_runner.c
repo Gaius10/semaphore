@@ -154,6 +154,9 @@ void run_training(struct options opts) {
 
         population_test(population, TRAINING_POPULATION_LEN, new_champion);
 
+        // printf("champion[6] = %lf, new_champion[6] = %lf\n", champion[6], new_champion[6]);
+        // getchar();
+
         if (new_champion[6] > champion[6]) {
             champions_file = fopen("champions.csv", "a+");
             fprintf(
@@ -252,8 +255,8 @@ void population_test(double* population, unsigned len, double* champion) {
         run_performance_stats(opts);
 
         performance_file = fopen("performance_stats.csv", "r");
-        // game_id,cars_created,cars_passed,average_wait_cycles,cycles_passed,final_status,game_over_reason
-        if (fscanf(performance_file, "%*s,%*s,%*s,%*s,%*s,%*s,%*s\n") != 0) {
+        // game_id,cars_created,cars_passed,cycles_passed,final_status,game_over_reason
+        if (fscanf(performance_file, "%*s,%*s,%*s,%*s,%*s,%*s\n") != 0) {
             fprintf(stderr, "Error skipping first line of performance file.\n");
             fclose(performance_file);
             exit(EXIT_FAILURE);
@@ -263,12 +266,13 @@ void population_test(double* population, unsigned len, double* champion) {
             if (
                 fscanf(
                     performance_file,
-                    "%*u,%*u,%u,%*u,%*u,%*[^\n]s,%*[^\n]s\n",
+                    "%*u,%*u,%u,%*u,%*[^\n]s,%*[^\n]s\n",
                     &scores[i]
                 ) != 1
             ) {
                 fprintf(stderr, "Error reading performance.\n");
                 fclose(performance_file);
+                resetTermios();
                 exit(EXIT_FAILURE);
             }
         }
@@ -329,7 +333,7 @@ void run_performance_stats(struct options opts) {
     pthread_join(observer_thread, NULL);
 
     // Output stats
-    fprintf(output_file, "game_id,cars_created,cars_passed,average_wait_cycles,cycles_passed,final_status,game_over_reason\n");
+    fprintf(output_file, "game_id,cars_created,cars_passed,cycles_passed,final_status,game_over_reason\n");
     char* reason_phrase[] = {
         "N/A",
         "Road Overflow",
@@ -343,11 +347,10 @@ void run_performance_stats(struct options opts) {
     };
 
     for (unsigned i = 0; i < opts.number_of_games; i++) {
-        fprintf(output_file, "%u,%u,%u,%u,%u,%s,%s\n",
+        fprintf(output_file, "%u,%u,%u,%u,%s,%s\n",
             i + 1,
             gamebags[i].game.stats.cars_created,
             gamebags[i].game.stats.cars_passed,
-            gamebags[i].game.stats.average_wait_cycles,
             gamebags[i].game.stats.cycles_passed,
             status_phrase[gamebags[i].game.status],
             reason_phrase[gamebags[i].game.stats.game_over_reason]
@@ -385,12 +388,11 @@ void* performance_observer(void* args) {
                 some_game_running = true;
             }
 
-            printf("Game %u: Status: %s | Cars Created: %u | Cars Passed: %u | Average Wait Cycles: %u | Cycles Passed: %u | Game Over Reason: %s\n",
+            printf("Game %u: Status: %s | Cars Created: %u | Cars Passed: %u |  Cycles Passed: %u | Game Over Reason: %s\n",
                 i + 1,
                 status_phrase[gamebags[i].game.status],
                 gamebags[i].game.stats.cars_created,
                 gamebags[i].game.stats.cars_passed,
-                gamebags[i].game.stats.average_wait_cycles,
                 gamebags[i].game.stats.cycles_passed,
                 reason_phrase[gamebags[i].game.stats.game_over_reason]
             );

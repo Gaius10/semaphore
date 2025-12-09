@@ -96,8 +96,8 @@ void* ai_commander_specimen_model_01(void* arg) {
         avg_distance1 = avg_origin_distance(&game->road1);
         avg_distance2 = avg_origin_distance(&game->road2);
 
-        signal_horizontal = fmod(road1_a + road1_b * avg_distance1 + road1_c * avg_distance2, 100) > 50;
-        signal_vertical = fmod(road2_a + road2_b * avg_distance1 + road2_c * avg_distance2, 100) > 50;
+        signal_horizontal = road1_a + road1_b * avg_distance1 + road1_c * avg_distance2 > 0;
+        signal_vertical = road2_a + road2_b * avg_distance1 + road2_c * avg_distance2 > 0;
 
         apply_signals(&game->traffic_light, signal_horizontal, signal_vertical);
 

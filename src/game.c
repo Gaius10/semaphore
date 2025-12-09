@@ -29,29 +29,7 @@ void game_init(game_t* game) {
         .cars_created = 0,
         .cars_passed = 0,
         .cycles_passed = 0,
-        .average_wait_cycles = 0
     };
-}
-
-void game_update_stats(game_t* game) {
-    unsigned int cars_at_road_1 = game->road1.size;
-    unsigned int cars_at_road_2 = game->road2.size;
-    unsigned int total_cars = cars_at_road_1 + cars_at_road_2;
-
-    unsigned int total_wait_cycles = 0;
-    for (uint8_t i = 0; i < cars_at_road_1; i++) {
-        car_t* car = (car_t*)list_get(&game->road1, i);
-        total_wait_cycles += car->cycles_waited;
-    }
-
-    for (uint8_t i = 0; i < cars_at_road_2; i++) {
-        car_t* car = (car_t*)list_get(&game->road2, i);
-        total_wait_cycles += car->cycles_waited;
-    }
-
-    if (total_cars > 0) {
-        game->stats.average_wait_cycles = total_wait_cycles / total_cars;
-    }
 }
 
 /**
@@ -182,11 +160,10 @@ void* car_mover(void* arg) {
 
             car_buffer->pos_x += 1;
 
-            // This would be for memmory saving, but it causes issues with stats calculation
-            // if (car_buffer->pos_x > 10) {
-            //     list_remove(road1, i);
-            //     i--;
-            // }
+            if (car_buffer->pos_x > 10) {
+                list_remove(road1, i);
+                i--;
+            }
         }
 
         // Process road 2
@@ -209,15 +186,13 @@ void* car_mover(void* arg) {
 
             car_buffer->pos_y += 1;
 
-            // This would be for memmory saving, but it causes issues with stats calculation
-            // if (car_buffer->pos_y > 10) {
-            //     list_remove(road2, i);
-            //     i--;
-            // }
+            if (car_buffer->pos_y > 10) {
+                list_remove(road2, i);
+                i--;
+            }
         }
 
         game->stats.cycles_passed++;
-        game_update_stats(game);
 
         sem_post(&game->road1_memmory);
         sem_post(&game->road2_memmory);
