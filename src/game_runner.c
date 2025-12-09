@@ -117,10 +117,10 @@ void run_training(struct options opts) {
             champion[5],
             champion[6]
         );
-        getchar();
+        // getchar();
     } else {
         printf("No previous champion.\n");
-        getchar();
+        // getchar();
     }
     fclose(champions_file);
 
@@ -160,13 +160,13 @@ void run_training(struct options opts) {
                 champions_file,
                 "%u,%.18lf,%.18lf,%.18lf,%.18lf,%.18lf,%.18lf,%.18lf\n",
                 last_champion_id++,
-                champion[0],
-                champion[1],
-                champion[2],
-                champion[3],
-                champion[4],
-                champion[5],
-                champion[6]
+                new_champion[0],
+                new_champion[1],
+                new_champion[2],
+                new_champion[3],
+                new_champion[4],
+                new_champion[5],
+                new_champion[6]
             );
             fclose(champions_file);
 
