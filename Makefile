@@ -6,9 +6,11 @@ LDLIBS  := -lm -lpthread -lc
 TARGET  := semaphore
 
 OBJS := \
-	build/main.o
+	build/main.o \
+	build/config.o
 
-LIBS :=
+LIBS := \
+	src/config/config.h
 
 .PHONY: all clean run
 
@@ -27,5 +29,8 @@ $(TARGET): $(OBJS)
 # Objects build
 build/main.o: src/main.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/main.c -o build/main.o
+
+build/config.o: src/config/config.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/config/config.c -o build/config.o
 
 # @todo
