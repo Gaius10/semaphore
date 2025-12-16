@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "config/config.h"
+#include "game/game.h"
 
 unsigned int parse_args(int argc, char** argv, config_t* config);
 void print_usage();
@@ -20,9 +21,7 @@ int main(int argc, char** argv) {
     }
 
     if (config.mode == MODE_DEFAULT) {
-        printf("Mode default.\n");
-        // @todo
-        return 0;
+        return game_play(config) == GAME_OK ? 0 : 1;
     }
 
     printf("Mode not yet implemented.\n");

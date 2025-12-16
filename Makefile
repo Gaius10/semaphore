@@ -7,10 +7,12 @@ TARGET  := semaphore
 
 OBJS := \
 	build/main.o \
-	build/config.o
+	build/config.o \
+	build/game.o
 
 LIBS := \
-	src/config/config.h
+	src/config/config.h \
+	src/game/game.h
 
 .PHONY: all clean run
 
@@ -32,5 +34,8 @@ build/main.o: src/main.c $(LIBS)
 
 build/config.o: src/config/config.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/config/config.c -o build/config.o
+
+build/game.o: src/game/game.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/game/game.c -o build/game.o
 
 # @todo
