@@ -1,6 +1,7 @@
 
 CC      := gcc
-CFLAGS  := -std=c2x -Wall -Wextra -Wpedantic -O3
+# CFLAGS  := -std=c2x -Wall -Wextra -Wpedantic -O3
+CFLAGS  := -std=c2x
 LDFLAGS :=
 LDLIBS  := -lm -lpthread -lc
 TARGET  := semaphore

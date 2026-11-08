@@ -10,54 +10,36 @@ void print_usage();
 int main(int argc, char** argv) {
     config_t config;
 
-    if (parse_args(argc, argv, &config) != 0) {
-        print_usage();
+    config_status_t _config = config_parse_file("config.ini", &config);
+    if (_config == CONFIG_STATUS_EACCESS) {
+        printf("Error accessing config file.\n");
+        printf("Make sure the file 'config.ini' exists and is readable.\n");
         return 1;
     }
 
-    if (config.mode == MODE_HELP) {
-        print_usage();
-        return 0;
+    if (_config == CONFIG_STATUS_EPARSE) {
+        printf("Error parsing config file.\n");
+        printf("Check the format of the config file.\n");
+        return 1;
     }
 
-    if (config.mode == MODE_DEFAULT) {
-        return game_play(config) == GAME_OK ? 0 : 1;
+    if (config.mode != MODE_HUMAN_PLAYER) {
+        printf("Not implemented yet.\n");
+        printf("Only human player mode is currently supported.\n");
+        return 1;
     }
 
-    printf("Mode not yet implemented.\n");
-    return 1;
+    if (config.mode == MODE_HUMAN_PLAYER) {
+        game_exec_status_t _game = game_play(config);
+        if (_game != GAME_EXEC_STATUS_OK) {
+            printf("Error during game execution.\n");
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 void print_usage() {
     printf("Usage: semaphore [-h [--config <path>]]\n");
-}
-
-unsigned int parse_args(int argc, char** argv, config_t* config) {
-    config->mode = MODE_DEFAULT;
-
-    if (argc > 3) {
-        config->mode = MODE_HELP;
-        return 1;
-    }
-
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-h") == 0) {
-            config->mode = MODE_HELP;
-            continue;
-        }
-
-        if (strcmp(argv[i], "--config") == 0) {
-            if (config_parse_file(argv[++i], config) != CONFIG_OK) {
-                printf("Error parsing config file.\n");
-                return 1;
-            }
-
-            continue;
-        }
-
-        printf("Error: invalid flag '%s'\n", argv[i]);
-        return 1;
-    }
-
-    return 0;
 }
