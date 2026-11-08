@@ -24,22 +24,6 @@ car_t* car_create(int x, int y) {
     return car;
 }
 
-void car_move_left(car_t* car) {
-   car_move(car, -1, 0);
-}
-
-void car_move_right(car_t* car) {
-    car_move(car, 1, 0);
-}
-
-void car_move_up(car_t* car) {
-    car_move(car, 0, 1);
-}
-
-void car_move_down(car_t* car) {
-    car_move(car, 0, -1);
-}
-
 void car_wait(car_t* car) {
     if (car == NULL) {
         return;

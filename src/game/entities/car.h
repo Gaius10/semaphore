@@ -6,10 +6,6 @@ typedef struct Car car_t;
 
 car_t* car_create(int x, int y);
 
-void car_move_left(car_t* car);
-void car_move_right(car_t* car);
-void car_move_up(car_t* car);
-void car_move_down(car_t* car);
 void car_wait(car_t* car);
 
 int car_get_x(const car_t* car);
