@@ -5,17 +5,16 @@
 
 #define ROAD_MAX_SIZE 100
 
-typedef struct road_t {
-    car_t* items[ROAD_MAX_SIZE];
-    int size;
-} road_t;
 
-void road_init(road_t* road);
+typedef struct Road road_t;
 
-void road_append(road_t* road, car_t* car);
-void road_remove(road_t* road, int index);
+road_t* road_create(void);
+
+void road_append(road_t* road, const car_t* car);
+void road_remove(road_t* road, const int index);
 void road_destroy(road_t** road);
 
-car_t* road_get(road_t* road, int index);
+car_t* road_get(const road_t* road, const int index);
+int road_size(const road_t* road);
 
 #endif

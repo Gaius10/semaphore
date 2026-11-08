@@ -4,12 +4,26 @@
 #include "./road.h"
 #include "./car.h"
 
-void road_init(road_t* road) {
+struct Road {
+    car_t* items[ROAD_MAX_SIZE];
+    int size;
+};
+
+road_t* road_create(void) {
+    road_t* road = malloc(sizeof(road_t));
+    if (road == NULL) {
+        printf("Memory allocation failed to road.\n");
+        printf("Exiting...\n");
+        exit(1);
+    }
+
     for (unsigned i = 0; i < ROAD_MAX_SIZE; i++) {
         road->items[i] = NULL;
     }
 
     road->size = 0;
+
+    return road;
 }
 
 void road_append(road_t* road, car_t* car) {
@@ -45,11 +59,15 @@ void road_destroy(road_t** road) {
     *road = NULL;
 }
 
-car_t* road_get(road_t* road, int index) {
+car_t* road_get(const road_t* road, int index) {
     if (index < 0 || index >= road->size) {
         printf("Index out of bounds. Cannot get car.\n");
         return NULL;
     }
 
     return road->items[index];
+}
+
+int road_size(const road_t* road) {
+    return road->size;
 }
