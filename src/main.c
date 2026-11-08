@@ -4,8 +4,7 @@
 #include "config/config.h"
 #include "game/game.h"
 
-unsigned int parse_args(int argc, char** argv, config_t* config);
-void print_usage();
+static mode_run_human_player(const config_t* config);
 
 int main(int argc, char** argv) {
     config_t config;
@@ -30,16 +29,22 @@ int main(int argc, char** argv) {
     }
 
     if (config.mode == MODE_HUMAN_PLAYER) {
-        game_exec_status_t _game = game_play(config);
-        if (_game != GAME_EXEC_STATUS_OK) {
-            printf("Error during game execution.\n");
-            return 1;
-        }
+        mode_run_human_player(&config);
     }
 
     return 0;
 }
 
-void print_usage() {
-    printf("Usage: semaphore [-h [--config <path>]]\n");
+static mode_run_human_player(const config_t* config) {
+    game_t* game = NULL;
+
+    game_status_t _game = game_create(*config, &game);
+    if (_game == GAME_STATUS_ENOMEM) {
+        printf("Error creating game: out of memory.\n");
+        return 1;
+    }
+
+    game_run(game);
+
+    return 0;
 }
