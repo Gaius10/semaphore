@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "./road.h"
 #include "./car.h"
@@ -9,36 +8,35 @@ struct Road {
     int size;
 };
 
-road_t* road_create(void) {
-    road_t* road = malloc(sizeof(road_t));
-    if (road == NULL) {
-        printf("Memory allocation failed to road.\n");
-        printf("Exiting...\n");
-        exit(1);
+road_status_t road_create(road_t** road) {
+    road_t* new_road = malloc(sizeof(road_t));
+    if (new_road == NULL) {
+        return ROAD_STATUS_ENOMEM;
     }
 
     for (unsigned i = 0; i < ROAD_MAX_SIZE; i++) {
-        road->items[i] = NULL;
+        new_road->items[i] = NULL;
     }
 
-    road->size = 0;
+    new_road->size = 0;
+    *road = new_road;
 
-    return road;
+    return ROAD_STATUS_OK;
 }
 
-void road_append(road_t* road, car_t* car) {
+road_status_t road_append(road_t* road, car_t* car) {
     if (road->size >= ROAD_MAX_SIZE) {
-        printf("road_t is full. Cannot append new car.\n");
-        return;
+        return ROAD_STATUS_EFULL;
     }
 
     road->items[road->size++] = car;
+
+    return ROAD_STATUS_OK;
 }
 
-void road_remove(road_t* road, int index) {
+road_status_t road_remove(road_t* road, const int index) {
     if (index < 0 || index >= road->size) {
-        printf("Index out of bounds. Cannot remove car.\n");
-        return;
+        return ROAD_STATUS_EINDEX;
     }
 
     car_destroy(road->items[index]);
@@ -47,6 +45,8 @@ void road_remove(road_t* road, int index) {
     }
 
     road->size--;
+
+    return ROAD_STATUS_OK;
 }
 
 void road_destroy(road_t** road) {
@@ -59,13 +59,14 @@ void road_destroy(road_t** road) {
     *road = NULL;
 }
 
-car_t* road_get(const road_t* road, int index) {
+road_status_t road_get(const road_t* road, const int index, car_t** car) {
     if (index < 0 || index >= road->size) {
-        printf("Index out of bounds. Cannot get car.\n");
-        return NULL;
+        return ROAD_STATUS_EINDEX;
     }
 
-    return road->items[index];
+    *car = road->items[index];
+
+    return ROAD_STATUS_OK;
 }
 
 int road_size(const road_t* road) {
