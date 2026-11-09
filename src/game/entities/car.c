@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "./car.h"
 
@@ -9,19 +8,18 @@ struct Car {
     unsigned int cycles_waited;
 };
 
-car_t* car_create(int x, int y) {
-    car_t* car = (car_t*)malloc(sizeof(car_t));
-    if (car == NULL) {
-        printf("Memory allocation failed to car.\n");
-        printf("Exiting...\n");
-        exit(1);
+car_status_t car_create(int x, int y, car_t** car) {
+    car_t* new_car = malloc(sizeof(car_t));
+    if (new_car == NULL) {
+        return CAR_STATUS_ENOMEM;
     }
 
-    car->pos_x = x;
-    car->pos_y = y;
-    car->cycles_waited = 0;
+    new_car->pos_x = x;
+    new_car->pos_y = y;
+    new_car->cycles_waited = 0;
+    *car = new_car;
 
-    return car;
+    return CAR_STATUS_OK;
 }
 
 void car_wait(car_t* car) {
