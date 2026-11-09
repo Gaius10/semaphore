@@ -38,10 +38,6 @@ int car_get_y(const car_t* car) {
     return car->pos_y;
 }
 
-unsigned int car_get_cycles_waited(const car_t* car) {
-    return car->cycles_waited;
-}
-
 void car_move(car_t* car, int delta_x, int delta_y) {
     if (car == NULL) {
         return;

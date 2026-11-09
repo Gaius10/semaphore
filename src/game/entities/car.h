@@ -18,7 +18,6 @@ void car_wait(car_t* car);
 
 int car_get_x(const car_t* car);
 int car_get_y(const car_t* car);
-unsigned int car_get_cycles_waited(const car_t* car);
 
 void car_move(car_t* car, int delta_x, int delta_y);
 void car_destroy(car_t* car);
