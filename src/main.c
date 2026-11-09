@@ -4,7 +4,7 @@
 #include "config/config.h"
 #include "game/game.h"
 
-static mode_run_human_player(const config_t* config);
+static int mode_run_human_player(const config_t* config);
 
 int main(int argc, char** argv) {
     config_t config;
@@ -29,13 +29,17 @@ int main(int argc, char** argv) {
     }
 
     if (config.mode == MODE_HUMAN_PLAYER) {
-        mode_run_human_player(&config);
+        int _run = mode_run_human_player(&config);
+        if (_run != 0) {
+            printf("Error running game.\n");
+            return 1;
+        }
     }
 
     return 0;
 }
 
-static mode_run_human_player(const config_t* config) {
+static int mode_run_human_player(const config_t* config) {
     game_t* game = NULL;
 
     game_status_t _game = game_create(*config, &game);
@@ -44,7 +48,7 @@ static mode_run_human_player(const config_t* config) {
         return 1;
     }
 
-    game_run(game);
+    printf("Game created successfully.\n");
 
     return 0;
 }
