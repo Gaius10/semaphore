@@ -9,11 +9,15 @@ TARGET  := semaphore
 OBJS := \
 	build/main.o \
 	build/config.o \
-	build/game.o
+	build/game.o \
+	build/road.o \
+	build/car.o
 
 LIBS := \
 	src/config/config.h \
-	src/game/game.h
+	src/game/game.h \
+	src/game/entities/road.h \
+	src/game/entities/car.h
 
 .PHONY: all clean run
 
@@ -38,5 +42,11 @@ build/config.o: src/config/config.c $(LIBS)
 
 build/game.o: src/game/game.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/game/game.c -o build/game.o
+
+build/road.o: src/game/entities/road.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/game/entities/road.c -o build/road.o
+
+build/car.o: src/game/entities/car.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/game/entities/car.c -o build/car.o
 
 # @todo
