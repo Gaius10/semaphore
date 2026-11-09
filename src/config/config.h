@@ -8,21 +8,23 @@ typedef struct config {
         MODE_TRAINING,
     } mode;
 
-    // struct config_human_player human_player;
-    // struct config_ai_player ai_player;
-    // struct config_training training; 
+    struct config_human_player* human_player;
+    // struct config_ai_player* ai_player;
+    // struct config_training* training; 
 } config_t;
 
-static struct config_human_player {
+struct config_human_player {
     /** World config */
+    double car_spawn_probability_h;
+    double car_spawn_probability_v;
 };
 
-static struct config_ai_player {
+struct config_ai_player {
     /** World config */
     /** AI config */
 };
 
-static struct config_training {
+struct config_training {
     /** World config (or World generation config) */
     /** AI config */
     /** Training config */

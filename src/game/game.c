@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "./game.h"
 #include "./entities/road.h"
@@ -56,6 +57,7 @@ game_state_t game_get_state(const game_t* game) {
 }
 
 void move_cars_through(road_t* road, int dx, int dy);
+void factory_car(road_t* road, double spawn_probability, int x, int y);
 game_state_t game_exec(game_t* game, game_command_t command) {
     if (game->state == GAME_STATE_ENDED) {
         return game->state;
@@ -63,6 +65,12 @@ game_state_t game_exec(game_t* game, game_command_t command) {
 
     move_cars_through(game->horizontal_road, 1, 0);
     move_cars_through(game->vertical_road, 0, 1);
+
+    double spawn_probability_h = game->config.human_player->car_spawn_probability_h;
+    double spawn_probability_v = game->config.human_player->car_spawn_probability_v;
+
+    factory_car(game->horizontal_road, spawn_probability_h, 0, road_size(game->vertical_road));
+    factory_car(game->vertical_road, spawn_probability_v, road_size(game->horizontal_road), 0);
 
     return game->state;
 }
@@ -77,5 +85,29 @@ void move_cars_through(road_t* road, int dx, int dy) {
         }
 
         car_move(car, dx, dy);
+    }
+}
+
+void factory_car(road_t* road, double spawn_probability, int x, int y) {
+    if ((double)rand() / RAND_MAX < spawn_probability) {
+        car_t* new_car = NULL;
+        car_status_t _car = car_create(x, y, &new_car);
+        if (_car != CAR_STATUS_OK) {
+            // Think about how to handle this error.
+            // For now, we just print an error message and return.
+            // I'm not sure if this is the best way to handle this, but it's a start.
+            fprintf(stderr, "Error creating car: %d\n", _car);
+            return;
+        }
+
+        road_status_t _road = road_append(road, new_car);
+        if (_road != ROAD_STATUS_OK) {
+            // Think about how to handle this error.
+            // For now, we just print an error message and return.
+            // I'm not sure if this is the best way to handle this, but it's a start.
+            fprintf(stderr, "Error appending car to road: %d\n", _road);
+            car_destroy(new_car);
+            return;
+        }
     }
 }

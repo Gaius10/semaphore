@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <time.h>
 
 #include "config/config.h"
 #include "game/game.h"
@@ -7,8 +9,9 @@
 static int mode_run_human_player(const config_t* config);
 
 int main(int argc, char** argv) {
-    config_t config;
+    srand((unsigned int) time(NULL));
 
+    config_t config;
     config_status_t _config = config_parse_file("config.ini", &config);
     if (_config == CONFIG_STATUS_EACCESS) {
         printf("Error accessing config file.\n");

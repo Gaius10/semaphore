@@ -40,6 +40,7 @@ config_status_t config_parse_file(const char* path, config_t* config) {
 }
 
 static void set_config_value(config_t* config, const char* key, const char* value) {
+    /** Read configured mode */
     if (strcmp(key, "mode") == 0) {
         if (strcmp(value, "human") == 0) {
             config->mode = MODE_HUMAN_PLAYER;
@@ -49,5 +50,26 @@ static void set_config_value(config_t* config, const char* key, const char* valu
             config->mode = MODE_TRAINING;
         }
     }
+
+    /** Human player config */
+    if (config->mode == MODE_HUMAN_PLAYER) {
+        // Parse human player specific configuration options
+        if (strcmp(key, "car_spawn_probability_h") == 0) {
+            sscanf(value, "%lf", &config->human_player->car_spawn_probability_h);
+        } else if (strcmp(key, "car_spawn_probability_v") == 0) {
+            sscanf(value, "%lf", &config->human_player->car_spawn_probability_v);
+        }
+    }
+
+    /** AI player config */
+    if (config->mode == MODE_AI_PLAYER) {
+        // Parse AI player specific configuration options
+    }
+
+    /** Training config */
+    if (config->mode == MODE_TRAINING) {
+        // Parse training specific configuration options
+    }
+
     // Add more key-value pairs as needed for other configuration options.
 }
