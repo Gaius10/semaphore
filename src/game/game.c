@@ -55,21 +55,27 @@ game_state_t game_get_state(const game_t* game) {
     return game->state;
 }
 
+void move_cars_through(road_t* road, int dx, int dy);
 game_state_t game_exec(game_t* game, game_command_t command) {
     if (game->state == GAME_STATE_ENDED) {
         return game->state;
     }
 
-    switch (command) {
-        case GAME_COMMAND_NOOP:
-            break;
-        case GAME_COMMAND_HORIZONTAL_TOGGLE:
-            break;
-        case GAME_COMMAND_VERTICAL_TOGGLE:
-            break;
-        default:
-            break;
-    }
+    move_cars_through(game->horizontal_road, 1, 0);
+    move_cars_through(game->vertical_road, 0, 1);
 
     return game->state;
+}
+
+void move_cars_through(road_t* road, int dx, int dy) {
+    for (int i = 0; i < road_size(road); i++) {
+        car_t* car;
+
+        road_status_t _road = road_get(road, i, &car);
+        if (_road != ROAD_STATUS_OK) {
+            continue;
+        }
+
+        car_move(car, dx, dy);
+    }
 }
