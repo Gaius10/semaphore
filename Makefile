@@ -19,7 +19,7 @@ LIBS := \
 	src/game/entities/road.h \
 	src/game/entities/car.h
 
-.PHONY: all clean run
+.PHONY: all clean run test
 
 all: $(TARGET)
 
@@ -27,7 +27,7 @@ run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET) $(TEST_OBJS) $(TEST_TARGET)
 
 # Builds main target
 $(TARGET): $(OBJS)
@@ -49,4 +49,31 @@ build/road.o: src/game/entities/road.c $(LIBS)
 build/car.o: src/game/entities/car.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/game/entities/car.c -o build/car.o
 
-# @todo
+# Unit tests (Check). Run with `make test` from the repo root.
+CHECK_CFLAGS := $(shell pkg-config --cflags check)
+CHECK_LIBS   := $(shell pkg-config --libs check)
+
+TEST_TARGET := build/test_runner
+
+# Only the units under test: no main.o, and game.o is left out until it has tests.
+TEST_SRC_OBJS := \
+	build/config.o \
+	build/road.o \
+	build/car.o
+
+TEST_OBJS := \
+	build/tests/check_main.o \
+	build/tests/check_car.o \
+	build/tests/check_road.o \
+	build/tests/check_config.o
+
+test: $(TEST_TARGET)
+	./$(TEST_TARGET)
+
+$(TEST_TARGET): $(TEST_OBJS) $(TEST_SRC_OBJS)
+	$(CC) $(LDFLAGS) $(TEST_OBJS) $(TEST_SRC_OBJS) -o $@ $(CHECK_LIBS)
+
+build/tests/%.o: tests/%.c tests/suites.h $(LIBS)
+	@mkdir -p build/tests
+	$(CC) $(CFLAGS) $(CHECK_CFLAGS) -c $< -o $@
+
