@@ -33,8 +33,8 @@ config_status_t config_create(const char* path, config_t** config) {
 
     /** Every field starts unset, so whatever the file leaves unset is a missing key. */
     new_config->mode = MODE_UNSET;
-    new_config->config_human_player.car_spawn_probability_h = NAN;
-    new_config->config_human_player.car_spawn_probability_v = NAN;
+    new_config->human_player.car_spawn_probability_h = NAN;
+    new_config->human_player.car_spawn_probability_v = NAN;
 
     config_status_t status = parse_file(path, new_config);
     if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {

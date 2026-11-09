@@ -18,7 +18,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
         return GAME_STATUS_ENOMEM;
     }
 
-    new_game->human_player = config_get_human_player(config);
+    new_game->config_human_player = config_get_human_player(config);
     new_game->state = GAME_STATE_RUNNING;
 
     if (road_create(&new_game->horizontal_road) != ROAD_STATUS_OK) {
@@ -66,8 +66,8 @@ game_state_t game_exec(game_t* game, game_command_t command) {
     move_cars_through(game->horizontal_road, 1, 0);
     move_cars_through(game->vertical_road, 0, 1);
 
-    double spawn_probability_h = game->human_player.car_spawn_probability_h;
-    double spawn_probability_v = game->human_player.car_spawn_probability_v;
+    double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
+    double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
 
     factory_car(game->horizontal_road, spawn_probability_h, 0, road_size(game->vertical_road));
     factory_car(game->vertical_road, spawn_probability_v, road_size(game->horizontal_road), 0);
