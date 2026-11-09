@@ -1,16 +1,75 @@
 #include "config.h"
 
+#include <ctype.h>
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_LINE_LENGTH 256
 
-static void set_config_value(config_t* config, const char* key, const char* value);
+struct Config {
+    config_mode_t mode;
+    config_human_player_t human_player;
+};
 
-config_status_t config_parse_file(const char* path, config_t* config) {
+/**
+ * Marks a field the file has not filled yet (there are no defaults). Kept out of the public
+ * enum: a config returned by config_create never has it. Must stay past the last config_mode_t.
+ */
+#define MODE_UNSET (MODE_TRAINING + 1)
+
+static config_status_t parse_file(const char* path, config_t* config);
+static config_status_t set_config_value(config_t* config, const char* key, const char* value);
+static config_status_t parse_probability(const char* value, double* out);
+static bool is_complete(const config_t* config);
+
+config_status_t config_create(const char* path, config_t** config) {
+    config_t* new_config = malloc(sizeof(config_t));
+    if (new_config == NULL) {
+        return CONFIG_STATUS_ENOMEM;
+    }
+
+    /** Every field starts unset, so whatever the file leaves unset is a missing key. */
+    new_config->mode = MODE_UNSET;
+    new_config->human_player.car_spawn_probability_h = NAN;
+    new_config->human_player.car_spawn_probability_v = NAN;
+
+    config_status_t status = parse_file(path, new_config);
+    if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {
+        status = CONFIG_STATUS_EMISSING;
+    }
+
+    if (status != CONFIG_STATUS_OK) {
+        free(new_config);
+        return status;
+    }
+
+    *config = new_config;
+
+    return CONFIG_STATUS_OK;
+}
+
+void config_destroy(config_t** config) {
+    if (config == NULL || *config == NULL) {
+        return;
+    }
+
+    free(*config);
+    *config = NULL;
+}
+
+config_mode_t config_get_mode(const config_t* config) {
+    return config->mode;
+}
+
+config_human_player_t config_get_human_player(const config_t* config) {
+    return config->human_player;
+}
+
+static config_status_t parse_file(const char* path, config_t* config) {
     FILE* file = fopen(path, "r");
-
     if (file == NULL) {
         return CONFIG_STATUS_EACCESS;
     }
@@ -21,6 +80,11 @@ config_status_t config_parse_file(const char* path, config_t* config) {
             break;
         }
 
+        if (strlen(line) > MAX_LINE_LENGTH) {
+            fclose(file);
+            return CONFIG_STATUS_EPARSE; // Line too long
+        }
+
         if (line[0] == '\n') continue; // Skip empty lines
         if (line[0] == '#') continue; // Skip comments
         if (line[0] == ';') continue; // Skip comments
@@ -28,19 +92,25 @@ config_status_t config_parse_file(const char* path, config_t* config) {
 
         char key[256], value[256];
         if (sscanf(line, "%255[^=]=%255[^\n]", key, value) != 2) {
+            fclose(file);
             return CONFIG_STATUS_EPARSE; // Error parsing line
         }
 
         // Parse the line and populate the config structure
-        set_config_value(config, key, value);
+        config_status_t status = set_config_value(config, key, value);
+        if (status != CONFIG_STATUS_OK) {
+            // @todo Figure a better way to track this
+            fclose(file);
+            return status;
+        }
     }
 
     fclose(file);
     return CONFIG_STATUS_OK;
 }
 
-static void set_config_value(config_t* config, const char* key, const char* value) {
-    /** Read configured mode */
+static config_status_t set_config_value(config_t* config, const char* key, const char* value) {
+    /** Mode */
     if (strcmp(key, "mode") == 0) {
         if (strcmp(value, "human") == 0) {
             config->mode = MODE_HUMAN_PLAYER;
@@ -48,28 +118,63 @@ static void set_config_value(config_t* config, const char* key, const char* valu
             config->mode = MODE_AI_PLAYER;
         } else if (strcmp(value, "training") == 0) {
             config->mode = MODE_TRAINING;
+        } else {
+            return CONFIG_STATUS_EPARSE;
         }
+
+        return CONFIG_STATUS_OK;
     }
 
-    /** Human player config */
-    if (config->mode == MODE_HUMAN_PLAYER) {
-        // Parse human player specific configuration options
-        if (strcmp(key, "car_spawn_probability_h") == 0) {
-            sscanf(value, "%lf", &config->human_player->car_spawn_probability_h);
-        } else if (strcmp(key, "car_spawn_probability_v") == 0) {
-            sscanf(value, "%lf", &config->human_player->car_spawn_probability_v);
-        }
+    /** Human player config (read whatever the mode is, so key order in the file does not matter) */
+    if (strcmp(key, "car_spawn_probability_h") == 0) {
+        return parse_probability(value, &config->human_player.car_spawn_probability_h);
+    }
+
+    if (strcmp(key, "car_spawn_probability_v") == 0) {
+        return parse_probability(value, &config->human_player.car_spawn_probability_v);
     }
 
     /** AI player config */
-    if (config->mode == MODE_AI_PLAYER) {
-        // Parse AI player specific configuration options
-    }
+    // Parse AI player specific configuration options
 
     /** Training config */
-    if (config->mode == MODE_TRAINING) {
-        // Parse training specific configuration options
-    }
+    // Parse training specific configuration options
 
     // Add more key-value pairs as needed for other configuration options.
+    // Unknown keys are ignored.
+    return CONFIG_STATUS_OK;
+}
+
+/** Accepts a whole number, optionally followed by whitespace (e.g. a trailing '\r'). Rejects NaN, which marks "unset". */
+static config_status_t parse_probability(const char* value, double* out) {
+    char* end = NULL;
+    double parsed = strtod(value, &end);
+    if (end == value || isnan(parsed)) {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    while (isspace((unsigned char) *end)) {
+        end++;
+    }
+
+    if (*end != '\0') {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    *out = parsed;
+    return CONFIG_STATUS_OK;
+}
+
+/** True when every field the config's mode needs has been filled. */
+static bool is_complete(const config_t* config) {
+    if (config->mode == MODE_UNSET) {
+        return false;
+    }
+
+    if (config->mode == MODE_HUMAN_PLAYER) {
+        return !isnan(config->human_player.car_spawn_probability_h)
+            && !isnan(config->human_player.car_spawn_probability_v);
+    }
+
+    return true;
 }

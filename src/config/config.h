@@ -1,23 +1,24 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-typedef struct config {
-    enum {
-        MODE_HUMAN_PLAYER,
-        MODE_AI_PLAYER,
-        MODE_TRAINING,
-    } mode;
+/** Opaque type: the struct is defined in config.c. Use the functions below. */
+typedef struct Config config_t;
 
-    struct config_human_player* human_player;
-    // struct config_ai_player* ai_player;
-    // struct config_training* training; 
-} config_t;
+typedef enum config_mode {
+    MODE_HUMAN_PLAYER,
+    MODE_AI_PLAYER,
+    MODE_TRAINING,
+} config_mode_t;
 
-struct config_human_player {
+/**
+ * Each section of the config is a plain public struct. The config hands them out as
+ * copies (see the config_get_* functions), so they stay valid after config_destroy.
+ */
+typedef struct config_human_player {
     /** World config */
     double car_spawn_probability_h;
     double car_spawn_probability_v;
-};
+} config_human_player_t;
 
 struct config_ai_player {
     /** World config */
@@ -32,10 +33,33 @@ struct config_training {
 
 typedef enum config_status {
     CONFIG_STATUS_OK,
+    /** Memory allocation failed (config_create). */
+    CONFIG_STATUS_ENOMEM,
+    /** File access error (config_create). */
     CONFIG_STATUS_EACCESS,
+    /** File parsing error (config_create). */
     CONFIG_STATUS_EPARSE,
+    /** A required key is absent from the file (config_create). */
+    CONFIG_STATUS_EMISSING,
 } config_status_t;
 
-config_status_t config_parse_file(const char* path, config_t* config);
+/**
+ * Builds a config from the ini file at `path`. There are no defaults: every key the
+ * config needs must be in the file. Required keys are `mode`, plus
+ * `car_spawn_probability_h` and `car_spawn_probability_v` when the mode is human.
+ * Unknown keys are ignored, and key order does not matter.
+ *
+ * On success, *config holds a new config that must be released with config_destroy.
+ * On failure, *config is left untouched and nothing is leaked.
+ *
+ * Returns CONFIG_STATUS_EACCESS if the file cannot be opened, CONFIG_STATUS_EPARSE if a
+ * line is malformed or a value is invalid, and CONFIG_STATUS_EMISSING if a required key
+ * is absent.
+ */
+config_status_t config_create(const char* path, config_t** config);
+void config_destroy(config_t** config);
+
+config_mode_t config_get_mode(const config_t* config);
+config_human_player_t config_get_human_player(const config_t* config);
 
 #endif
