@@ -80,7 +80,7 @@ static int mode_run_human_player(const config_t* config) {
     }
 
     int i = 0;
-    while (i++ < 10) {
+    while (i++ < 50) {
         game_exec(game, GAME_COMMAND_NOOP);
         view_render(
             view,

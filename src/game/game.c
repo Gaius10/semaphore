@@ -44,13 +44,12 @@ game_status_t game_create(const config_t* config, game_t** game) {
     }
 
     // The roads cross at (road_length_h, road_length_v). Each light stops its cars one cell before it.
-    unsigned int road_length_h = new_game->config_human_player.road_length_h;
-    unsigned int road_length_v = new_game->config_human_player.road_length_v;
-
-    traffic_light_status_t _light = traffic_light_create(
-        road_length_h - 1, road_length_v, TRAFFIC_LIGHT_GREEN, &new_game->horizontal_light
-    );
-
+    unsigned int rlen_h = new_game->config_human_player.road_length_h;
+    unsigned int rlen_v = new_game->config_human_player.road_length_v;
+    traffic_light_color_t green = TRAFFIC_LIGHT_GREEN;
+    traffic_light_status_t _light;
+    
+    _light = traffic_light_create(rlen_h - 1, rlen_v, green, &new_game->horizontal_light);
     if (_light != TRAFFIC_LIGHT_STATUS_OK) {
         road_destroy(&new_game->vertical_road);
         road_destroy(&new_game->horizontal_road);
@@ -58,7 +57,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
         return GAME_STATUS_ENOMEM;
     }
 
-    _light = traffic_light_create(road_length_h, road_length_v - 1, TRAFFIC_LIGHT_RED, &new_game->vertical_light);
+    _light = traffic_light_create(rlen_h, rlen_v - 1, green, &new_game->vertical_light);
     if (_light != TRAFFIC_LIGHT_STATUS_OK) {
         traffic_light_destroy(&new_game->horizontal_light);
         road_destroy(&new_game->vertical_road);
