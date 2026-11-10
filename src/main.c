@@ -82,7 +82,13 @@ static int mode_run_human_player(const config_t* config) {
     int i = 0;
     while (i++ < 10) {
         game_exec(game, GAME_COMMAND_NOOP);
-        view_render(view, game_get_horizontal_road(game), game_get_vertical_road(game));
+        view_render(
+            view,
+            game_get_horizontal_road(game),
+            game_get_vertical_road(game),
+            game_get_horizontal_light(game),
+            game_get_vertical_light(game)
+        );
         sleep(1);
     }
 

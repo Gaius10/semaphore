@@ -18,9 +18,12 @@ typedef struct config_human_player {
     /** World config */
     double car_spawn_probability_h;
     double car_spawn_probability_v;
-    /** Length of each road, in cars: the most cars that can be on it. Always positive. */
-    int road_length_h;
-    int road_length_v;
+    /**
+     * Length of each road, in cars: the most cars that can be on it. Always positive, and at most
+     * INT_MAX, since the game uses the lengths as (int) grid coordinates.
+     */
+    unsigned int road_length_h;
+    unsigned int road_length_v;
 } config_human_player_t;
 
 /** Size of the terminal view, in cells. Both are always positive. */

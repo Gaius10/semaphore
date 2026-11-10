@@ -3,9 +3,11 @@
 
 #include "../config/config.h"
 #include "./entities/road.h"
+#include "./entities/traffic_light.h"
 
 typedef struct Game game_t;
 
+/** What the player does on a tick. Each toggle flips the light of its road. */
 typedef enum GAME_COMMAND {
     GAME_COMMAND_NOOP,
     GAME_COMMAND_HORIZONTAL_TOGGLE,
@@ -41,6 +43,27 @@ game_state_t game_get_state(const game_t* game);
 const road_t* game_get_horizontal_road(const game_t* game);
 const road_t* game_get_vertical_road(const game_t* game);
 
+/**
+ * Read-only access to the roads' traffic lights. Like the roads, the pointers stay owned by the
+ * game and are valid until game_destroy. The horizontal light starts green and the vertical one
+ * starts red. The horizontal stop cell is (road_length_h - 1, road_length_v) and the vertical
+ * one is (road_length_h, road_length_v - 1), right before the crossing at
+ * (road_length_h, road_length_v).
+ */
+const traffic_light_t* game_get_horizontal_light(const game_t* game);
+const traffic_light_t* game_get_vertical_light(const game_t* game);
+
+/** How many ticks ended with cars of both roads in the crossing. Crashes do not end the game. */
+unsigned int game_get_crashes(const game_t* game);
+
+/**
+ * Runs one tick:
+ * 1. Applies the command (a toggle flips the light of its road).
+ * 2. Moves every car one cell along its road. A car waits instead when its light holds it
+ *    (red, and the car is on the stop cell) or when the car ahead of it is in the way.
+ * 3. Counts a crash if both roads have a car in the crossing.
+ * 4. Spawns new cars, unless the road's spawn cell is taken by a car that is waiting.
+ */
 game_state_t game_exec(game_t* game, game_command_t command);
 
 #endif

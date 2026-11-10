@@ -1,8 +1,10 @@
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #include "./game.h"
 #include "./entities/road.h"
+#include "./entities/traffic_light.h"
 #include "../config/config.h"
 
 struct Game {
@@ -10,7 +12,15 @@ struct Game {
     game_state_t state;
     road_t* horizontal_road;
     road_t* vertical_road;
+    traffic_light_t* horizontal_light;
+    traffic_light_t* vertical_light;
+    unsigned int crashes;
 };
+
+static void apply_command(game_t* game, game_command_t command);
+static void move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy);
+static bool road_has_car_at(const road_t* road, int x, int y);
+static void factory_car(road_t* road, double spawn_probability, int x, int y);
 
 game_status_t game_create(const config_t* config, game_t** game) {
     game_t* new_game = malloc(sizeof(game_t));
@@ -20,6 +30,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
 
     new_game->config_human_player = config_get_human_player(config);
     new_game->state = GAME_STATE_RUNNING;
+    new_game->crashes = 0;
 
     if (road_create(&new_game->horizontal_road) != ROAD_STATUS_OK) {
         free(new_game);
@@ -27,6 +38,30 @@ game_status_t game_create(const config_t* config, game_t** game) {
     }
 
     if (road_create(&new_game->vertical_road) != ROAD_STATUS_OK) {
+        road_destroy(&new_game->horizontal_road);
+        free(new_game);
+        return GAME_STATUS_ENOMEM;
+    }
+
+    // The roads cross at (road_length_h, road_length_v). Each light stops its cars one cell before it.
+    unsigned int road_length_h = new_game->config_human_player.road_length_h;
+    unsigned int road_length_v = new_game->config_human_player.road_length_v;
+
+    traffic_light_status_t _light = traffic_light_create(
+        road_length_h - 1, road_length_v, TRAFFIC_LIGHT_GREEN, &new_game->horizontal_light
+    );
+
+    if (_light != TRAFFIC_LIGHT_STATUS_OK) {
+        road_destroy(&new_game->vertical_road);
+        road_destroy(&new_game->horizontal_road);
+        free(new_game);
+        return GAME_STATUS_ENOMEM;
+    }
+
+    _light = traffic_light_create(road_length_h, road_length_v - 1, TRAFFIC_LIGHT_RED, &new_game->vertical_light);
+    if (_light != TRAFFIC_LIGHT_STATUS_OK) {
+        traffic_light_destroy(&new_game->horizontal_light);
+        road_destroy(&new_game->vertical_road);
         road_destroy(&new_game->horizontal_road);
         free(new_game);
         return GAME_STATUS_ENOMEM;
@@ -44,6 +79,8 @@ void game_destroy(game_t** game) {
 
     road_destroy(&(*game)->horizontal_road);
     road_destroy(&(*game)->vertical_road);
+    traffic_light_destroy(&(*game)->horizontal_light);
+    traffic_light_destroy(&(*game)->vertical_light);
     free(*game);
     *game = NULL;
 }
@@ -64,20 +101,37 @@ const road_t* game_get_vertical_road(const game_t* game) {
     return game->vertical_road;
 }
 
-void move_cars_through(road_t* road, int dx, int dy);
-void factory_car(road_t* road, double spawn_probability, int x, int y);
+const traffic_light_t* game_get_horizontal_light(const game_t* game) {
+    return game->horizontal_light;
+}
+
+const traffic_light_t* game_get_vertical_light(const game_t* game) {
+    return game->vertical_light;
+}
+
+unsigned int game_get_crashes(const game_t* game) {
+    return game->crashes;
+}
+
 game_state_t game_exec(game_t* game, game_command_t command) {
     if (game->state == GAME_STATE_ENDED) {
         return game->state;
     }
 
-    move_cars_through(game->horizontal_road, 1, 0);
-    move_cars_through(game->vertical_road, 0, 1);
+    apply_command(game, command);
+
+    move_cars_through(game->horizontal_road, game->horizontal_light, 1, 0);
+    move_cars_through(game->vertical_road, game->vertical_light, 0, 1);
 
     double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
     double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
-    int road_length_h = game->config_human_player.road_length_h;
-    int road_length_v = game->config_human_player.road_length_v;
+    unsigned int road_length_h = game->config_human_player.road_length_h;
+    unsigned int road_length_v = game->config_human_player.road_length_v;
+
+    if (road_has_car_at(game->horizontal_road, road_length_h, road_length_v)
+            && road_has_car_at(game->vertical_road, road_length_h, road_length_v)) {
+        game->crashes++;
+    }
 
     factory_car(game->horizontal_road, spawn_probability_h, 0, road_length_v);
     factory_car(game->vertical_road, spawn_probability_v, road_length_h, 0);
@@ -85,20 +139,64 @@ game_state_t game_exec(game_t* game, game_command_t command) {
     return game->state;
 }
 
-void move_cars_through(road_t* road, int dx, int dy) {
-    for (int i = 0; i < road_size(road); i++) {
-        car_t* car;
-
-        road_status_t _road = road_get(road, i, &car);
-        if (_road != ROAD_STATUS_OK) {
-            continue;
-        }
-
-        car_move(car, dx, dy);
+static void apply_command(game_t* game, game_command_t command) {
+    switch (command) {
+        case GAME_COMMAND_HORIZONTAL_TOGGLE:
+            traffic_light_toggle(game->horizontal_light);
+            break;
+        case GAME_COMMAND_VERTICAL_TOGGLE:
+            traffic_light_toggle(game->vertical_light);
+            break;
+        case GAME_COMMAND_NOOP:
+            break;
     }
 }
 
-void factory_car(road_t* road, double spawn_probability, int x, int y) {
+/**
+ * The road holds its cars in spawn order, so each car is right behind the one before it in the
+ * road. Going front to back, the car ahead has already moved (or waited) when a car checks
+ * whether the cell it wants is free.
+ */
+static void move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy) {
+    car_t* ahead = NULL;
+
+    for (int i = 0; i < road_size(road); i++) {
+        car_t* car = NULL;
+        if (road_get(road, i, &car) != ROAD_STATUS_OK) {
+            continue;
+        }
+
+        int x = car_get_x(car);
+        int y = car_get_y(car);
+        bool held = traffic_light_holds(light, x, y);
+        bool blocked = ahead != NULL && car_get_x(ahead) == x + dx && car_get_y(ahead) == y + dy;
+
+        if (held || blocked) {
+            car_wait(car);
+        } else {
+            car_move(car, dx, dy);
+        }
+
+        ahead = car;
+    }
+}
+
+static bool road_has_car_at(const road_t* road, int x, int y) {
+    for (int i = 0; i < road_size(road); i++) {
+        car_t* car = NULL;
+        if (road_get(road, i, &car) == ROAD_STATUS_OK && car_get_x(car) == x && car_get_y(car) == y) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static void factory_car(road_t* road, double spawn_probability, int x, int y) {
+    if (road_has_car_at(road, x, y)) {
+        return; // The queue reaches back to the spawn cell: the road is full
+    }
+
     if ((double)rand() / RAND_MAX < spawn_probability) {
         car_t* new_car = NULL;
         car_status_t _car = car_create(x, y, &new_car);

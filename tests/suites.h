@@ -8,5 +8,6 @@ Suite* road_suite(void);
 Suite* config_suite(void);
 Suite* view_suite(void);
 Suite* game_suite(void);
+Suite* traffic_light_suite(void);
 
 #endif

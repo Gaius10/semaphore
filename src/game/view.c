@@ -15,6 +15,7 @@ struct View {
 };
 
 static void plot_road(view_t* view, const road_t* road, char symbol);
+static void plot_light(view_t* view, const traffic_light_t* light, int dx, int dy);
 static bool in_grid(const view_t* view, int x, int y);
 static unsigned int cell_index(const view_t* view, unsigned int x, unsigned int y);
 static unsigned int cell_count(const view_t* view);
@@ -59,11 +60,21 @@ void view_destroy(view_t** view) {
     *view = NULL;
 }
 
-void view_render(view_t* view, const road_t* horizontal, const road_t* vertical) {
+void view_render(
+    view_t* view,
+    const road_t* horizontal_road,
+    const road_t* vertical_road,
+    const traffic_light_t* horizontal_light,
+    const traffic_light_t* vertical_light
+) {
     memset(view->cells, VIEW_EMPTY, cell_count(view));
 
-    plot_road(view, horizontal, VIEW_CAR_HORIZONTAL);
-    plot_road(view, vertical, VIEW_CAR_VERTICAL);
+    plot_road(view, horizontal_road, VIEW_CAR_HORIZONTAL);
+    plot_road(view, vertical_road, VIEW_CAR_VERTICAL);
+
+    // On the drivers' right: below for cars moving right, left for cars moving down
+    plot_light(view, horizontal_light, 0, 1);
+    plot_light(view, vertical_light, -1, 0);
 
     fputs(VIEW_CLEAR_SCREEN, view->out);
     for (unsigned int y = 0; y < view->height; y++) {
@@ -98,6 +109,22 @@ static void plot_road(view_t* view, const road_t* road, char symbol) {
         char* cell = &view->cells[cell_index(view, (unsigned int) x, (unsigned int) y)];
         *cell = merge_symbols(*cell, symbol);
     }
+}
+
+/** Draws `light` at its stop cell shifted by (dx, dy). */
+static void plot_light(view_t* view, const traffic_light_t* light, int dx, int dy) {
+    if (light == NULL) {
+        return;
+    }
+
+    unsigned int x = (unsigned int) (traffic_light_get_x(light) + dx);
+    unsigned int y = (unsigned int) (traffic_light_get_y(light) + dy);
+    if (!in_grid(view, (int) x, (int) y)) {
+        return;
+    }
+
+    char symbol = traffic_light_get_color(light) == TRAFFIC_LIGHT_GREEN ? VIEW_LIGHT_GREEN : VIEW_LIGHT_RED;
+    view->cells[cell_index(view, x, y)] = symbol;
 }
 
 static bool in_grid(const view_t* view, int x, int y) {

@@ -19,7 +19,7 @@ Also there is a evolutionary system model that learns optimal ways to control th
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
-│       └── entities/          car and road (opaque types, create/destroy style)
+│       └── entities/          car, road and traffic_light (opaque types, create/destroy style)
 ├── tests/                     Unit tests (Check), one check_<module>.c per module
 └── build/                     Object files and the test runner (git-ignored)
 ```
@@ -52,7 +52,7 @@ Run the unit tests (from the repository root):
 make test
 ```
 
-The tests cover `car`, `road`, `config`, `view` and `game`, and live in `tests/check_*.c`. Each module has its own
+The tests cover `car`, `road`, `traffic_light`, `config`, `view` and `game`, and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
@@ -119,6 +119,42 @@ The game and the view share one coordinate system, like the screen: `(0, 0)` is 
 move right, so the horizontal road is the row `y = road_length_v`. The view draws a
 `view_width` x `view_height` grid and skips cars that fall outside of it, so make it at least as big
 as the roads.
+
+## Traffic Lights
+
+The roads cross at `(road_length_h, road_length_v)`, and each road has its own traffic light. The
+horizontal light starts green and the vertical one starts red. The game commands
+`GAME_COMMAND_HORIZONTAL_TOGGLE` and `GAME_COMMAND_VERTICAL_TOGGLE` switch a light between green and red.
+For now the simulation only sends `GAME_COMMAND_NOOP`: there is no keyboard control yet.
+
+Each light has a stop cell, the last cell of its road before the crossing:
+`(road_length_h - 1, road_length_v)` for the horizontal road and `(road_length_h, road_length_v - 1)`
+for the vertical one. On every tick:
+
+1. The command is applied.
+2. Every car moves one cell, except a car on its stop cell while the light is red, and a car whose
+   next cell is taken by the car ahead of it. Those wait, so a red light builds a queue. Cars
+   already in the crossing or past it never stop.
+3. If both roads have a car in the crossing, the game counts a crash (`game_get_crashes`). The game
+   keeps running.
+4. New cars spawn, unless the queue reaches back to the spawn cell. A road therefore holds at most
+   its length in cars before the crossing.
+
+Both lights can be green at the same time, so it is up to the player to avoid crashes.
+
+### View symbols
+
+| Symbol | Meaning                                   |
+|--------|-------------------------------------------|
+| `>`    | Car on the horizontal road (moves right)  |
+| `v`    | Car on the vertical road (moves down)     |
+| `X`    | Cars of both roads in the same cell       |
+| `G`    | Green light                               |
+| `R`    | Red light                                 |
+| `\|`   | Right edge of the grid                    |
+
+Each light is drawn next to its stop cell, on the drivers' right: below the horizontal road's stop
+cell and left of the vertical road's stop cell.
 
 ## Author
 

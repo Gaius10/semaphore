@@ -26,6 +26,7 @@ struct Config {
 static config_status_t parse_file(const char* path, config_t* config);
 static config_status_t set_config_value(config_t* config, const char* key, const char* value);
 static config_status_t parse_probability(const char* value, double* out);
+static config_status_t parse_positive_uint(const char* value, unsigned int max, unsigned int* out);
 static config_status_t parse_positive_int(const char* value, int* out);
 static bool is_complete(const config_t* config);
 
@@ -147,11 +148,11 @@ static config_status_t set_config_value(config_t* config, const char* key, const
     }
 
     if (strcmp(key, "road_length_h") == 0) {
-        return parse_positive_int(value, &config->human_player.road_length_h);
+        return parse_positive_uint(value, INT_MAX, &config->human_player.road_length_h);
     }
 
     if (strcmp(key, "road_length_v") == 0) {
-        return parse_positive_int(value, &config->human_player.road_length_v);
+        return parse_positive_uint(value, INT_MAX, &config->human_player.road_length_v);
     }
 
     /** View config */
@@ -194,12 +195,15 @@ static config_status_t parse_probability(const char* value, double* out) {
     return CONFIG_STATUS_OK;
 }
 
-/** Accepts a whole number above zero, optionally followed by whitespace. Zero marks "unset". */
-static config_status_t parse_positive_int(const char* value, int* out) {
+/**
+ * Accepts a whole number from 1 to `max`, optionally followed by whitespace. Zero marks "unset".
+ * Parsed as signed on purpose: strtoul would take "-3" and wrap it to a huge value.
+ */
+static config_status_t parse_positive_uint(const char* value, unsigned int max, unsigned int* out) {
     char* end = NULL;
     errno = 0;
-    long parsed = strtol(value, &end, 10);
-    if (end == value || errno == ERANGE || parsed < 1 || parsed > INT_MAX) {
+    long long parsed = strtoll(value, &end, 10);
+    if (end == value || errno == ERANGE || parsed < 1 || (unsigned long long) parsed > max) {
         return CONFIG_STATUS_EPARSE;
     }
 
@@ -209,6 +213,18 @@ static config_status_t parse_positive_int(const char* value, int* out) {
 
     if (*end != '\0') {
         return CONFIG_STATUS_EPARSE;
+    }
+
+    *out = (unsigned int) parsed;
+    return CONFIG_STATUS_OK;
+}
+
+/** Same as parse_positive_uint, into an int (so up to INT_MAX). */
+static config_status_t parse_positive_int(const char* value, int* out) {
+    unsigned int parsed = 0;
+    config_status_t status = parse_positive_uint(value, INT_MAX, &parsed);
+    if (status != CONFIG_STATUS_OK) {
+        return status;
     }
 
     *out = (int) parsed;

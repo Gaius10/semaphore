@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L /* mkstemp is hidden under strict -std=c2x */
 
 #include <check.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -65,8 +66,8 @@ START_TEST(test_config_parses_human_mode) {
     ck_assert_int_eq(config_get_mode(config), MODE_HUMAN_PLAYER);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_h, 0.25, 1e-9);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_v, 0.75, 1e-9);
-    ck_assert_int_eq(config_get_human_player(config).road_length_h, 10);
-    ck_assert_int_eq(config_get_human_player(config).road_length_v, 12);
+    ck_assert_uint_eq(config_get_human_player(config).road_length_h, 10);
+    ck_assert_uint_eq(config_get_human_player(config).road_length_v, 12);
     ck_assert_int_eq(config_get_view(config).width, 21);
     ck_assert_int_eq(config_get_view(config).height, 15);
 }
@@ -184,8 +185,11 @@ START_TEST(test_config_invalid_probability) {
 END_TEST
 
 START_TEST(test_config_invalid_sizes) {
-    /* Lengths and view sizes are positive whole numbers: zero, negatives, fractions, junk and overflow are out. */
-    const char* bad[] = {"0", "-3", "abc", "1.5", "5x", "", "99999999999999999999"};
+    /*
+     * Lengths and view sizes are whole numbers from 1 to INT_MAX: zero, negatives, fractions, junk
+     * and overflow are out. "4294967293" is "-3" wrapped to unsigned, which strtoul would accept.
+     */
+    const char* bad[] = {"0", "-3", "abc", "1.5", "5x", "", "99999999999999999999", "2147483648", "4294967293"};
 
     for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
         char contents[256];
@@ -198,6 +202,13 @@ START_TEST(test_config_invalid_sizes) {
         ck_assert_int_eq(create_from(contents), CONFIG_STATUS_EPARSE);
         ck_assert_ptr_null(config);
     }
+}
+END_TEST
+
+START_TEST(test_config_road_length_accepts_int_max) {
+    /* The largest length that still fits the game's (int) coordinates. */
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_V VIEW_W VIEW_H "road_length_h=2147483647\n"), CONFIG_STATUS_OK);
+    ck_assert_uint_eq(config_get_human_player(config).road_length_h, INT_MAX);
 }
 END_TEST
 
@@ -288,6 +299,7 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_unknown_mode);
     tcase_add_test(tc, test_config_invalid_probability);
     tcase_add_test(tc, test_config_invalid_sizes);
+    tcase_add_test(tc, test_config_road_length_accepts_int_max);
     tcase_add_test(tc, test_config_nan_probability_is_invalid);
     tcase_add_test(tc, test_config_malformed_line);
     tcase_add_test(tc, test_config_missing_file);

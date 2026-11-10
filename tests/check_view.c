@@ -9,6 +9,7 @@
 
 #include "../src/game/entities/car.h"
 #include "../src/game/entities/road.h"
+#include "../src/game/entities/traffic_light.h"
 #include "../src/game/view.h"
 #include "suites.h"
 
@@ -25,6 +26,10 @@ static view_t* view;
 static FILE* out;
 static char* output;
 static size_t output_size;
+
+/* Lights made by make_light(), freed in teardown. */
+static traffic_light_t* lights[2];
+static int light_count;
 
 static void setup(void) {
     ck_assert_int_eq(road_create(&horizontal), ROAD_STATUS_OK);
@@ -43,6 +48,18 @@ static void teardown(void) {
 
     road_destroy(&horizontal);
     road_destroy(&vertical);
+
+    for (int i = 0; i < light_count; i++) {
+        traffic_light_destroy(&lights[i]);
+    }
+    light_count = 0;
+}
+
+static traffic_light_t* make_light(int x, int y, traffic_light_color_t color) {
+    ck_assert_int_lt(light_count, 2);
+    traffic_light_t** light = &lights[light_count++];
+    ck_assert_int_eq(traffic_light_create(x, y, color, light), TRAFFIC_LIGHT_STATUS_OK);
+    return *light;
 }
 
 static void add_car(road_t* road, int x, int y) {
@@ -51,16 +68,26 @@ static void add_car(road_t* road, int x, int y) {
     ck_assert_int_eq(road_append(road, car), ROAD_STATUS_OK);
 }
 
-/** Renders a frame and returns it without the clear-screen prefix. */
-static const char* render(const road_t* h, const road_t* v) {
+/** Renders a frame with roads and lights and returns it without the clear-screen prefix. */
+static const char* render_all(const road_t* h, const road_t* v, const traffic_light_t* hl, const traffic_light_t* vl) {
     rewind(out);
-    view_render(view, h, v);
+    view_render(view, h, v, hl, vl);
 
     size_t prefix = strlen(VIEW_CLEAR_SCREEN);
     ck_assert_uint_eq(output_size, prefix + HEIGHT * LINE);
     ck_assert_int_eq(strncmp(output, VIEW_CLEAR_SCREEN, prefix), 0);
 
     return output + prefix;
+}
+
+/** Renders a frame with only the roads. */
+static const char* render(const road_t* h, const road_t* v) {
+    return render_all(h, v, NULL, NULL);
+}
+
+/** Renders a frame with only the lights. */
+static const char* render_lights(const traffic_light_t* hl, const traffic_light_t* vl) {
+    return render_all(NULL, NULL, hl, vl);
 }
 
 /** The character drawn at (x, y): column x of line y. */
@@ -200,6 +227,62 @@ START_TEST(test_view_render_does_not_change_the_roads) {
 }
 END_TEST
 
+START_TEST(test_view_horizontal_light_is_drawn_below_its_stop_cell) {
+    traffic_light_t* light = make_light(3, 1, TRAFFIC_LIGHT_GREEN);
+
+    const char* frame = render_lights(light, NULL);
+
+    ck_assert_int_eq(cell_at(frame, 3, 2), VIEW_LIGHT_GREEN);
+    ck_assert_int_eq(cell_at(frame, 3, 1), VIEW_EMPTY);
+}
+END_TEST
+
+START_TEST(test_view_vertical_light_is_drawn_left_of_its_stop_cell) {
+    traffic_light_t* light = make_light(3, 1, TRAFFIC_LIGHT_RED);
+
+    const char* frame = render_lights(NULL, light);
+
+    ck_assert_int_eq(cell_at(frame, 2, 1), VIEW_LIGHT_RED);
+    ck_assert_int_eq(cell_at(frame, 3, 1), VIEW_EMPTY);
+}
+END_TEST
+
+START_TEST(test_view_light_symbol_follows_its_color) {
+    traffic_light_t* green = make_light(1, 1, TRAFFIC_LIGHT_GREEN);
+    traffic_light_t* red = make_light(5, 1, TRAFFIC_LIGHT_RED);
+
+    const char* frame = render_lights(green, red);
+
+    ck_assert_int_eq(cell_at(frame, 1, 2), VIEW_LIGHT_GREEN);
+    ck_assert_int_eq(cell_at(frame, 4, 1), VIEW_LIGHT_RED);
+}
+END_TEST
+
+START_TEST(test_view_lights_next_to_cars_leave_the_cars_alone) {
+    /* The layout the game uses: the roads cross at (4, 2), each stop cell holds a waiting car. */
+    traffic_light_t* hl = make_light(3, 2, TRAFFIC_LIGHT_RED);
+    traffic_light_t* vl = make_light(4, 1, TRAFFIC_LIGHT_RED);
+    add_car(horizontal, 3, 2);
+    add_car(vertical, 4, 1);
+
+    const char* frame = render_all(horizontal, vertical, hl, vl);
+
+    ck_assert_int_eq(cell_at(frame, 3, 2), VIEW_CAR_HORIZONTAL);
+    ck_assert_int_eq(cell_at(frame, 4, 1), VIEW_CAR_VERTICAL);
+    ck_assert_int_eq(cell_at(frame, 3, 3), VIEW_LIGHT_RED);
+    ck_assert_int_eq(cell_at(frame, 3, 1), VIEW_LIGHT_RED);
+}
+END_TEST
+
+START_TEST(test_view_lights_outside_the_grid_are_not_drawn) {
+    /* Each stop cell is in the grid, but the light's own cell is not. */
+    traffic_light_t* hl = make_light(0, HEIGHT - 1, TRAFFIC_LIGHT_GREEN);
+    traffic_light_t* vl = make_light(0, 0, TRAFFIC_LIGHT_RED);
+
+    ck_assert(is_blank(render_lights(hl, vl)));
+}
+END_TEST
+
 START_TEST(test_view_create_rejects_zero_size) {
     view_t* other = NULL;
 
@@ -250,6 +333,11 @@ Suite* view_suite(void) {
     tcase_add_test(tc, test_view_cars_outside_the_grid_are_not_drawn);
     tcase_add_test(tc, test_view_render_twice_does_not_keep_the_old_frame);
     tcase_add_test(tc, test_view_render_does_not_change_the_roads);
+    tcase_add_test(tc, test_view_horizontal_light_is_drawn_below_its_stop_cell);
+    tcase_add_test(tc, test_view_vertical_light_is_drawn_left_of_its_stop_cell);
+    tcase_add_test(tc, test_view_light_symbol_follows_its_color);
+    tcase_add_test(tc, test_view_lights_next_to_cars_leave_the_cars_alone);
+    tcase_add_test(tc, test_view_lights_outside_the_grid_are_not_drawn);
     tcase_add_test(tc, test_view_create_rejects_zero_size);
     tcase_add_test(tc, test_view_create_rejects_size_that_overflows);
     tcase_add_test(tc, test_view_destroy_nulls_pointer);
