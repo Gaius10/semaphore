@@ -56,6 +56,14 @@ game_state_t game_get_state(const game_t* game) {
     return game->state;
 }
 
+const road_t* game_get_horizontal_road(const game_t* game) {
+    return game->horizontal_road;
+}
+
+const road_t* game_get_vertical_road(const game_t* game) {
+    return game->vertical_road;
+}
+
 void move_cars_through(road_t* road, int dx, int dy);
 void factory_car(road_t* road, double spawn_probability, int x, int y);
 game_state_t game_exec(game_t* game, game_command_t command) {

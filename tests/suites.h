@@ -6,5 +6,6 @@
 Suite* car_suite(void);
 Suite* road_suite(void);
 Suite* config_suite(void);
+Suite* view_suite(void);
 
 #endif

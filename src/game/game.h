@@ -2,6 +2,7 @@
 #define GAME_H
 
 #include "../config/config.h"
+#include "./entities/road.h"
 
 typedef struct Game game_t;
 
@@ -32,6 +33,14 @@ game_status_t game_create(const config_t* config, game_t** game);
 void game_destroy(game_t** game);
 
 game_state_t game_get_state(const game_t* game);
+
+/**
+ * Read-only access to the game's own roads, e.g. to hand them to a view.
+ * The pointers stay owned by the game and are only valid until the next game_exec or game_destroy.
+ */
+const road_t* game_get_horizontal_road(const game_t* game);
+const road_t* game_get_vertical_road(const game_t* game);
+
 game_state_t game_exec(game_t* game, game_command_t command);
 
 #endif

@@ -18,6 +18,7 @@ Also there is a evolutionary system model that learns optimal ways to control th
 │   ├── config/                Config file loading (opaque config_t + getters)
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
+│       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
 │       └── entities/          car and road (opaque types, create/destroy style)
 ├── tests/                     Unit tests (Check), one check_<module>.c per module
 └── build/                     Object files and the test runner (git-ignored)
@@ -51,7 +52,7 @@ Run the unit tests (from the repository root):
 make test
 ```
 
-The tests cover `car`, `road` and `config`, and live in `tests/check_*.c`. Each module has its own
+The tests cover `car`, `road`, `config` and `view`, and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
