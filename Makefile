@@ -60,9 +60,10 @@ CHECK_LIBS   := $(shell pkg-config --libs check)
 
 TEST_TARGET := build/test_runner
 
-# Only the units under test: no main.o, and game.o is left out until it has tests.
+# Only the units under test: no main.o (it has its own main()).
 TEST_SRC_OBJS := \
 	build/config.o \
+	build/game.o \
 	build/view.o \
 	build/road.o \
 	build/car.o
@@ -72,7 +73,8 @@ TEST_OBJS := \
 	build/tests/check_car.o \
 	build/tests/check_road.o \
 	build/tests/check_config.o \
-	build/tests/check_view.o
+	build/tests/check_view.o \
+	build/tests/check_game.o
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)

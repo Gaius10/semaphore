@@ -1,6 +1,8 @@
 #include "config.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -12,6 +14,7 @@
 struct Config {
     config_mode_t mode;
     config_human_player_t human_player;
+    config_view_t view;
 };
 
 /**
@@ -23,6 +26,7 @@ struct Config {
 static config_status_t parse_file(const char* path, config_t* config);
 static config_status_t set_config_value(config_t* config, const char* key, const char* value);
 static config_status_t parse_probability(const char* value, double* out);
+static config_status_t parse_positive_int(const char* value, int* out);
 static bool is_complete(const config_t* config);
 
 config_status_t config_create(const char* path, config_t** config) {
@@ -35,6 +39,10 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->mode = MODE_UNSET;
     new_config->human_player.car_spawn_probability_h = NAN;
     new_config->human_player.car_spawn_probability_v = NAN;
+    new_config->human_player.road_length_h = 0; // Valid sizes are positive, so 0 is unset
+    new_config->human_player.road_length_v = 0;
+    new_config->view.width = 0;
+    new_config->view.height = 0;
 
     config_status_t status = parse_file(path, new_config);
     if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {
@@ -66,6 +74,10 @@ config_mode_t config_get_mode(const config_t* config) {
 
 config_human_player_t config_get_human_player(const config_t* config) {
     return config->human_player;
+}
+
+config_view_t config_get_view(const config_t* config) {
+    return config->view;
 }
 
 static config_status_t parse_file(const char* path, config_t* config) {
@@ -134,6 +146,23 @@ static config_status_t set_config_value(config_t* config, const char* key, const
         return parse_probability(value, &config->human_player.car_spawn_probability_v);
     }
 
+    if (strcmp(key, "road_length_h") == 0) {
+        return parse_positive_int(value, &config->human_player.road_length_h);
+    }
+
+    if (strcmp(key, "road_length_v") == 0) {
+        return parse_positive_int(value, &config->human_player.road_length_v);
+    }
+
+    /** View config */
+    if (strcmp(key, "view_width") == 0) {
+        return parse_positive_int(value, &config->view.width);
+    }
+
+    if (strcmp(key, "view_height") == 0) {
+        return parse_positive_int(value, &config->view.height);
+    }
+
     /** AI player config */
     // Parse AI player specific configuration options
 
@@ -165,6 +194,27 @@ static config_status_t parse_probability(const char* value, double* out) {
     return CONFIG_STATUS_OK;
 }
 
+/** Accepts a whole number above zero, optionally followed by whitespace. Zero marks "unset". */
+static config_status_t parse_positive_int(const char* value, int* out) {
+    char* end = NULL;
+    errno = 0;
+    long parsed = strtol(value, &end, 10);
+    if (end == value || errno == ERANGE || parsed < 1 || parsed > INT_MAX) {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    while (isspace((unsigned char) *end)) {
+        end++;
+    }
+
+    if (*end != '\0') {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    *out = (int) parsed;
+    return CONFIG_STATUS_OK;
+}
+
 /** True when every field the config's mode needs has been filled. */
 static bool is_complete(const config_t* config) {
     if (config->mode == MODE_UNSET) {
@@ -173,7 +223,11 @@ static bool is_complete(const config_t* config) {
 
     if (config->mode == MODE_HUMAN_PLAYER) {
         return !isnan(config->human_player.car_spawn_probability_h)
-            && !isnan(config->human_player.car_spawn_probability_v);
+            && !isnan(config->human_player.car_spawn_probability_v)
+            && config->human_player.road_length_h > 0
+            && config->human_player.road_length_v > 0
+            && config->view.width > 0
+            && config->view.height > 0;
     }
 
     return true;

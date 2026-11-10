@@ -1,4 +1,5 @@
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -7,21 +8,42 @@
 
 struct View {
     FILE* out;
+    unsigned int width;
+    unsigned int height;
+    /** Scratch frame, width * height cells, row by row. Redrawn on every render. */
+    char* cells;
 };
 
-typedef char grid_t[VIEW_SIZE][VIEW_SIZE];
-
-static void plot_road(grid_t grid, const road_t* road, char symbol);
-static bool to_cell(int x, int y, int* row, int* col);
+static void plot_road(view_t* view, const road_t* road, char symbol);
+static bool in_grid(const view_t* view, int x, int y);
+static unsigned int cell_index(const view_t* view, unsigned int x, unsigned int y);
+static unsigned int cell_count(const view_t* view);
 static char merge_symbols(char current, char incoming);
 
-view_status_t view_create(FILE* out, view_t** view) {
+view_status_t view_create(FILE* out, unsigned int width, unsigned int height, view_t** view) {
+    if (width == 0 || height == 0) {
+        return VIEW_STATUS_EINVAL;
+    }
+
+    unsigned int cells_needed = width * height;
+    if (cells_needed / width != height) {
+        return VIEW_STATUS_ENOMEM; // width * height overflowed
+    }
+
     view_t* new_view = malloc(sizeof(view_t));
     if (new_view == NULL) {
         return VIEW_STATUS_ENOMEM;
     }
 
+    new_view->cells = malloc(cells_needed);
+    if (new_view->cells == NULL) {
+        free(new_view);
+        return VIEW_STATUS_ENOMEM;
+    }
+
     new_view->out = out;
+    new_view->width = width;
+    new_view->height = height;
     *view = new_view;
 
     return VIEW_STATUS_OK;
@@ -32,27 +54,30 @@ void view_destroy(view_t** view) {
         return;
     }
 
+    free((*view)->cells);
     free(*view);
     *view = NULL;
 }
 
-void view_render(const view_t* view, const road_t* horizontal, const road_t* vertical) {
-    grid_t grid;
-    memset(grid, VIEW_EMPTY, sizeof(grid));
+void view_render(view_t* view, const road_t* horizontal, const road_t* vertical) {
+    memset(view->cells, VIEW_EMPTY, cell_count(view));
 
-    plot_road(grid, horizontal, VIEW_CAR_HORIZONTAL);
-    plot_road(grid, vertical, VIEW_CAR_VERTICAL);
+    plot_road(view, horizontal, VIEW_CAR_HORIZONTAL);
+    plot_road(view, vertical, VIEW_CAR_VERTICAL);
 
     fputs(VIEW_CLEAR_SCREEN, view->out);
-    for (int row = 0; row < VIEW_SIZE; row++) {
-        fwrite(grid[row], 1, VIEW_SIZE, view->out);
+    for (unsigned int y = 0; y < view->height; y++) {
+        const char* row = &view->cells[cell_index(view, 0, y)];
+
+        fwrite(row, sizeof(char), view->width, view->out);
+        fputc(VIEW_EDGE, view->out);
         fputc('\n', view->out);
     }
 
     fflush(view->out);
 }
 
-static void plot_road(grid_t grid, const road_t* road, char symbol) {
+static void plot_road(view_t* view, const road_t* road, char symbol) {
     if (road == NULL) {
         return;
     }
@@ -64,25 +89,29 @@ static void plot_road(grid_t grid, const road_t* road, char symbol) {
             continue;
         }
 
-        int row, col;
-        if (!to_cell(car_get_x(car), car_get_y(car), &row, &col)) {
-            continue; // Outside of the grid
+        int x = car_get_x(car);
+        int y = car_get_y(car);
+        if (!in_grid(view, x, y)) {
+            continue;
         }
 
-        grid[row][col] = merge_symbols(grid[row][col], symbol);
+        char* cell = &view->cells[cell_index(view, (unsigned int) x, (unsigned int) y)];
+        *cell = merge_symbols(*cell, symbol);
     }
 }
 
-/** Converts a world position to a grid cell. Returns false if the position is off the grid. */
-static bool to_cell(int x, int y, int* row, int* col) {
-    if (x < -VIEW_RADIUS || x > VIEW_RADIUS || y < -VIEW_RADIUS || y > VIEW_RADIUS) {
-        return false;
-    }
+static bool in_grid(const view_t* view, int x, int y) {
+    // Negative coordinates are checked first, so the casts below never see them
+    return x >= 0 && (unsigned int) x < view->width && y >= 0 && (unsigned int) y < view->height;
+}
 
-    *row = VIEW_RADIUS - y; // Row 0 is the top of the screen, which is y = +VIEW_RADIUS
-    *col = x + VIEW_RADIUS;
+/** Position of cell (x, y) in `cells`, which holds the grid row by row. (x, y) must be in the grid. */
+static unsigned int cell_index(const view_t* view, unsigned int x, unsigned int y) {
+    return y * view->width + x;
+}
 
-    return true;
+static unsigned int cell_count(const view_t* view) {
+    return view->width * view->height;
 }
 
 /** What a cell shows after a car drawn as `incoming` enters a cell that shows `current`. */

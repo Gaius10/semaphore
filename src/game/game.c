@@ -76,9 +76,11 @@ game_state_t game_exec(game_t* game, game_command_t command) {
 
     double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
     double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
+    int road_length_h = game->config_human_player.road_length_h;
+    int road_length_v = game->config_human_player.road_length_v;
 
-    factory_car(game->horizontal_road, spawn_probability_h, 0, road_size(game->vertical_road));
-    factory_car(game->vertical_road, spawn_probability_v, road_size(game->horizontal_road), 0);
+    factory_car(game->horizontal_road, spawn_probability_h, 0, road_length_v);
+    factory_car(game->vertical_road, spawn_probability_v, road_length_h, 0);
 
     return game->state;
 }

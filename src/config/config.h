@@ -18,7 +18,16 @@ typedef struct config_human_player {
     /** World config */
     double car_spawn_probability_h;
     double car_spawn_probability_v;
+    /** Length of each road, in cars: the most cars that can be on it. Always positive. */
+    int road_length_h;
+    int road_length_v;
 } config_human_player_t;
+
+/** Size of the terminal view, in cells. Both are always positive. */
+typedef struct config_view {
+    int width;
+    int height;
+} config_view_t;
 
 struct config_ai_player {
     /** World config */
@@ -45,8 +54,9 @@ typedef enum config_status {
 
 /**
  * Builds a config from the ini file at `path`. There are no defaults: every key the
- * config needs must be in the file. Required keys are `mode`, plus
- * `car_spawn_probability_h` and `car_spawn_probability_v` when the mode is human.
+ * config needs must be in the file. Required keys are `mode`, plus these when the mode is human:
+ * `car_spawn_probability_h`, `car_spawn_probability_v`, `road_length_h`, `road_length_v`,
+ * `view_width` and `view_height`. The lengths and the view size must be positive whole numbers.
  * Unknown keys are ignored, and key order does not matter.
  *
  * On success, *config holds a new config that must be released with config_destroy.
@@ -61,5 +71,6 @@ void config_destroy(config_t** config);
 
 config_mode_t config_get_mode(const config_t* config);
 config_human_player_t config_get_human_player(const config_t* config);
+config_view_t config_get_view(const config_t* config);
 
 #endif

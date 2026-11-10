@@ -20,10 +20,19 @@ static const char* write_config(const char* contents) {
     return path;
 }
 
-/** A complete human-mode config. Tests that need a variation start from the pieces. */
+/**
+ * A complete human-mode config, in pieces so a test can leave one out or change it.
+ * The values differ from each other so that a swapped pair of getters would be caught.
+ */
 #define MODE_HUMAN "mode=human\n"
 #define SPAWN_H "car_spawn_probability_h=0.25\n"
 #define SPAWN_V "car_spawn_probability_v=0.75\n"
+#define ROAD_H "road_length_h=10\n"
+#define ROAD_V "road_length_v=12\n"
+#define VIEW_W "view_width=21\n"
+#define VIEW_H "view_height=15\n"
+#define NO_MODE SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H
+#define FULL_HUMAN MODE_HUMAN NO_MODE
 
 /** Writes `contents` to the temp file and builds `config` from it. */
 static config_status_t create_from(const char* contents) {
@@ -51,12 +60,15 @@ START_TEST(test_config_parses_human_mode) {
         MODE_HUMAN
         "\n"
         "[human_player]\n"
-        SPAWN_H
-        SPAWN_V), CONFIG_STATUS_OK);
+        NO_MODE), CONFIG_STATUS_OK);
 
     ck_assert_int_eq(config_get_mode(config), MODE_HUMAN_PLAYER);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_h, 0.25, 1e-9);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_v, 0.75, 1e-9);
+    ck_assert_int_eq(config_get_human_player(config).road_length_h, 10);
+    ck_assert_int_eq(config_get_human_player(config).road_length_v, 12);
+    ck_assert_int_eq(config_get_view(config).width, 21);
+    ck_assert_int_eq(config_get_view(config).height, 15);
 }
 END_TEST
 
@@ -73,7 +85,7 @@ START_TEST(test_config_parses_training_mode) {
 END_TEST
 
 START_TEST(test_config_key_order_does_not_matter) {
-    ck_assert_int_eq(create_from(SPAWN_V SPAWN_H MODE_HUMAN), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(VIEW_H VIEW_W ROAD_V ROAD_H SPAWN_V SPAWN_H MODE_HUMAN), CONFIG_STATUS_OK);
 
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_h, 0.25, 1e-9);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_v, 0.75, 1e-9);
@@ -85,21 +97,19 @@ START_TEST(test_config_skips_comments_and_blank_lines) {
         "# hash comment\n"
         "; semicolon comment\n"
         "\n"
-        MODE_HUMAN
-        SPAWN_H
-        SPAWN_V), CONFIG_STATUS_OK);
+        FULL_HUMAN), CONFIG_STATUS_OK);
 
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_h, 0.25, 1e-9);
 }
 END_TEST
 
 START_TEST(test_config_ignores_unknown_keys) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V "something_else=1\n"), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(FULL_HUMAN "something_else=1\n"), CONFIG_STATUS_OK);
 }
 END_TEST
 
 START_TEST(test_config_accepts_trailing_whitespace) {
-    ck_assert_int_eq(create_from(MODE_HUMAN "car_spawn_probability_h=0.25 \r\n" SPAWN_V), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(MODE_HUMAN "car_spawn_probability_h=0.25 \r\n" SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_OK);
     ck_assert_double_eq_tol(config_get_human_player(config).car_spawn_probability_h, 0.25, 1e-9);
 }
 END_TEST
@@ -111,19 +121,43 @@ START_TEST(test_config_empty_file_is_missing_mode) {
 END_TEST
 
 START_TEST(test_config_missing_mode) {
-    ck_assert_int_eq(create_from(SPAWN_H SPAWN_V), CONFIG_STATUS_EMISSING);
+    ck_assert_int_eq(create_from(NO_MODE), CONFIG_STATUS_EMISSING);
     ck_assert_ptr_null(config);
 }
 END_TEST
 
 START_TEST(test_config_human_mode_missing_spawn_h) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_V), CONFIG_STATUS_EMISSING);
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
     ck_assert_ptr_null(config);
 }
 END_TEST
 
 START_TEST(test_config_human_mode_missing_spawn_v) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H), CONFIG_STATUS_EMISSING);
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
+    ck_assert_ptr_null(config);
+}
+END_TEST
+
+START_TEST(test_config_human_mode_missing_road_length_h) {
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
+    ck_assert_ptr_null(config);
+}
+END_TEST
+
+START_TEST(test_config_human_mode_missing_road_length_v) {
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_H VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
+    ck_assert_ptr_null(config);
+}
+END_TEST
+
+START_TEST(test_config_human_mode_missing_view_width) {
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_H), CONFIG_STATUS_EMISSING);
+    ck_assert_ptr_null(config);
+}
+END_TEST
+
+START_TEST(test_config_human_mode_missing_view_height) {
+    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W), CONFIG_STATUS_EMISSING);
     ck_assert_ptr_null(config);
 }
 END_TEST
@@ -149,6 +183,24 @@ START_TEST(test_config_invalid_probability) {
 }
 END_TEST
 
+START_TEST(test_config_invalid_sizes) {
+    /* Lengths and view sizes are positive whole numbers: zero, negatives, fractions, junk and overflow are out. */
+    const char* bad[] = {"0", "-3", "abc", "1.5", "5x", "", "99999999999999999999"};
+
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+        char contents[256];
+
+        snprintf(contents, sizeof(contents), MODE_HUMAN SPAWN_H SPAWN_V ROAD_V VIEW_W VIEW_H "road_length_h=%s\n", bad[i]);
+        ck_assert_int_eq(create_from(contents), CONFIG_STATUS_EPARSE);
+        ck_assert_ptr_null(config);
+
+        snprintf(contents, sizeof(contents), MODE_HUMAN SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_H "view_width=%s\n", bad[i]);
+        ck_assert_int_eq(create_from(contents), CONFIG_STATUS_EPARSE);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
 START_TEST(test_config_nan_probability_is_invalid) {
     /* NaN is what marks an unset field internally, so it must not be accepted as a value. */
     ck_assert_int_eq(create_from(MODE_HUMAN "car_spawn_probability_h=nan\n" SPAWN_V), CONFIG_STATUS_EPARSE);
@@ -169,7 +221,7 @@ START_TEST(test_config_missing_file) {
 END_TEST
 
 START_TEST(test_config_getter_returns_copy) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(FULL_HUMAN), CONFIG_STATUS_OK);
 
     config_human_player_t copy = config_get_human_player(config);
     copy.car_spawn_probability_h = 0.99;
@@ -179,7 +231,7 @@ START_TEST(test_config_getter_returns_copy) {
 END_TEST
 
 START_TEST(test_config_getter_outlives_config) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(FULL_HUMAN), CONFIG_STATUS_OK);
 
     config_human_player_t copy = config_get_human_player(config);
     config_destroy(&config);
@@ -189,7 +241,7 @@ START_TEST(test_config_getter_outlives_config) {
 END_TEST
 
 START_TEST(test_config_destroy_nulls_pointer) {
-    ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(FULL_HUMAN), CONFIG_STATUS_OK);
 
     config_destroy(&config);
 
@@ -228,9 +280,14 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_missing_mode);
     tcase_add_test(tc, test_config_human_mode_missing_spawn_h);
     tcase_add_test(tc, test_config_human_mode_missing_spawn_v);
+    tcase_add_test(tc, test_config_human_mode_missing_road_length_h);
+    tcase_add_test(tc, test_config_human_mode_missing_road_length_v);
+    tcase_add_test(tc, test_config_human_mode_missing_view_width);
+    tcase_add_test(tc, test_config_human_mode_missing_view_height);
     tcase_add_test(tc, test_config_other_modes_do_not_need_human_keys);
     tcase_add_test(tc, test_config_unknown_mode);
     tcase_add_test(tc, test_config_invalid_probability);
+    tcase_add_test(tc, test_config_invalid_sizes);
     tcase_add_test(tc, test_config_nan_probability_is_invalid);
     tcase_add_test(tc, test_config_malformed_line);
     tcase_add_test(tc, test_config_missing_file);

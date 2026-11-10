@@ -52,7 +52,7 @@ Run the unit tests (from the repository root):
 make test
 ```
 
-The tests cover `car`, `road`, `config` and `view`, and live in `tests/check_*.c`. Each module has its own
+The tests cover `car`, `road`, `config`, `view` and `game`, and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
@@ -89,17 +89,36 @@ mode=human
 [human_player]
 car_spawn_probability_h=0.5
 car_spawn_probability_v=0.5
+road_length_h=10
+road_length_v=10
+
+[view]
+view_width=21
+view_height=21
 ```
 
-| Key                       | Required                 | Description                                         |
-|---------------------------|--------------------------|-----------------------------------------------------|
-| `mode`                    | always                   | `human`, `ai` or `training`                         |
-| `car_spawn_probability_h` | when `mode=human`        | Chance of a car spawning on the horizontal road each tick |
-| `car_spawn_probability_v` | when `mode=human`        | Chance of a car spawning on the vertical road each tick   |
+| Key                       | Required          | Description                                                              |
+|---------------------------|-------------------|--------------------------------------------------------------------------|
+| `mode`                    | always            | `human`, `ai` or `training`                                              |
+| `car_spawn_probability_h` | when `mode=human` | Chance of a car spawning on the horizontal road each tick                |
+| `car_spawn_probability_v` | when `mode=human` | Chance of a car spawning on the vertical road each tick                  |
+| `road_length_h`           | when `mode=human` | Length of the horizontal road, in cars (a positive whole number)         |
+| `road_length_v`           | when `mode=human` | Length of the vertical road, in cars (a positive whole number)           |
+| `view_width`              | when `mode=human` | Width of the terminal view, in cells (a positive whole number)           |
+| `view_height`             | when `mode=human` | Height of the terminal view, in cells (a positive whole number)          |
 
 There are no defaults: a missing required key is an error, and so is a value that is not valid for
-its key (an unknown `mode`, or a probability that is not a number). Unknown keys are ignored and key
-order does not matter. Only `human` mode is implemented so far.
+its key (an unknown `mode`, a probability that is not a number, or a length or size that is not a
+positive whole number). Unknown keys are ignored and key order does not matter. Only `human` mode is
+implemented so far.
+
+### Coordinates
+
+The game and the view share one coordinate system, like the screen: `(0, 0)` is the top-left cell,
+`x` grows to the right and `y` grows downwards. Horizontal cars spawn at `(0, road_length_v)` and
+move right, so the horizontal road is the row `y = road_length_v`. The view draws a
+`view_width` x `view_height` grid and skips cars that fall outside of it, so make it at least as big
+as the roads.
 
 ## Author
 

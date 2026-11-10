@@ -38,13 +38,13 @@ int car_get_y(const car_t* car) {
     return car->pos_y;
 }
 
-void car_move(car_t* car, int delta_x, int delta_y) {
+void car_move(car_t* car, int dx, int dy) {
     if (car == NULL) {
         return;
     }
 
-    car->pos_x += delta_x;
-    car->pos_y += delta_y;
+    car->pos_x += dx;
+    car->pos_y += dy;
 }
 
 void car_destroy(car_t* car) {

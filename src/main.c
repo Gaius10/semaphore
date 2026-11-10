@@ -2,9 +2,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "config/config.h"
 #include "game/game.h"
+#include "game/view.h"
 
 static int run(const config_t* config);
 static int mode_run_human_player(const config_t* config);
@@ -68,7 +70,23 @@ static int mode_run_human_player(const config_t* config) {
         return 1;
     }
 
-    printf("Game created successfully.\n");
+    config_view_t view_config = config_get_view(config);
+    view_t* view = NULL;
+    view_status_t _view = view_create(stdout, view_config.width, view_config.height, &view);
+    if (_view != VIEW_STATUS_OK) {
+        printf("Error creating view.\n");
+        game_destroy(&game);
+        return 1;
+    }
 
+    int i = 0;
+    while (i++ < 10) {
+        game_exec(game, GAME_COMMAND_NOOP);
+        view_render(view, game_get_horizontal_road(game), game_get_vertical_road(game));
+        sleep(1);
+    }
+
+    view_destroy(&view);
+    game_destroy(&game);
     return 0;
 }
