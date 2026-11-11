@@ -13,6 +13,8 @@ OBJS := \
 	build/view.o \
 	build/input.o \
 	build/human_player.o \
+	build/ai_player.o \
+	build/ai.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -23,6 +25,9 @@ LIBS := \
 	src/game/view.h \
 	src/input/input.h \
 	src/mode/human_player.h \
+	src/mode/ai_player.h \
+	src/mode/sleep.h \
+	src/ai/ai.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -69,6 +74,12 @@ build/input.o: src/input/input.c $(LIBS)
 build/human_player.o: src/mode/human_player.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/mode/human_player.c -o build/human_player.o
 
+build/ai_player.o: src/mode/ai_player.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/mode/ai_player.c -o build/ai_player.o
+
+build/ai.o: src/ai/ai.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/ai/ai.c -o build/ai.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -81,6 +92,7 @@ TEST_SRC_OBJS := \
 	build/game.o \
 	build/view.o \
 	build/input.o \
+	build/ai.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -93,6 +105,7 @@ TEST_OBJS := \
 	build/tests/check_view.o \
 	build/tests/check_game.o \
 	build/tests/check_input.o \
+	build/tests/check_ai.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)

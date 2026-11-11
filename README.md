@@ -14,8 +14,10 @@ Also there is a evolutionary system model that learns optimal ways to control th
 ├── config.ini                 Simulation settings, read at startup
 ├── Makefile
 ├── src/
-│   ├── main.c                 Entry point: loads the config and starts a game
+│   ├── main.c                 Entry point: loads the config and starts the mode it asks for
 │   ├── config/                Config file loading (opaque config_t + getters)
+│   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop)
+│   ├── ai/                    The AI player: ai_decide(ai, game) answers with the next command
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
@@ -100,17 +102,23 @@ view_height=21
 | Key                       | Required          | Description                                                              |
 |---------------------------|-------------------|--------------------------------------------------------------------------|
 | `mode`                    | always            | `human`, `ai` or `training`                                              |
-| `car_spawn_probability_h` | when `mode=human` | Chance of a car spawning on the horizontal road each tick                |
-| `car_spawn_probability_v` | when `mode=human` | Chance of a car spawning on the vertical road each tick                  |
-| `road_length_h`           | when `mode=human` | Length of the horizontal road, in cars (a positive whole number)         |
-| `road_length_v`           | when `mode=human` | Length of the vertical road, in cars (a positive whole number)           |
-| `view_width`              | when `mode=human` | Width of the terminal view, in cells (a positive whole number)           |
-| `view_height`             | when `mode=human` | Height of the terminal view, in cells (a positive whole number)          |
+| `car_spawn_probability_h` | when `mode=human` or `ai` | Chance of a car spawning on the horizontal road each tick                |
+| `car_spawn_probability_v` | when `mode=human` or `ai` | Chance of a car spawning on the vertical road each tick                  |
+| `road_length_h`           | when `mode=human` or `ai` | Length of the horizontal road, in cars (a positive whole number)         |
+| `road_length_v`           | when `mode=human` or `ai` | Length of the vertical road, in cars (a positive whole number)           |
+| `view_width`              | when `mode=human` or `ai` | Width of the terminal view, in cells (a positive whole number)           |
+| `view_height`             | when `mode=human` or `ai` | Height of the terminal view, in cells (a positive whole number)          |
 
 There are no defaults: a missing required key is an error, and so is a value that is not valid for
 its key (an unknown `mode`, a probability that is not a number, or a length or size that is not a
-positive whole number). Unknown keys are ignored and key order does not matter. Only `human` mode is
-implemented so far.
+positive whole number). Unknown keys are ignored and key order does not matter. `human` and `ai` modes are
+implemented; `training` is not yet. Both use the same world and view keys.
+
+### AI mode
+
+With `mode=ai`, an AI picks the command of every tick instead of the keyboard. For now the only AI
+is a NOOP one: it never touches a light, so it only exists to exercise the architecture. There is
+no input in this mode, so stop it with Ctrl-C.
 
 ### Coordinates
 

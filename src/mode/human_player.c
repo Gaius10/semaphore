@@ -3,12 +3,11 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <threads.h>
-#include <time.h>
 
 #include "../game/game.h"
 #include "../game/view.h"
 #include "../input/input.h"
+#include "sleep.h"
 
 /** State shared by the game thread and the input thread. */
 typedef struct shared {
@@ -78,11 +77,6 @@ int mode_run_human_player(const config_t* config) {
     view_destroy(&view);
     game_destroy(&game);
     return 0;
-}
-
-static void sleep_ms(unsigned int ms) {
-    struct timespec time = { .tv_sec = ms / 1000, .tv_nsec = (long) (ms % 1000) * 1000000L };
-    thrd_sleep(&time, NULL);
 }
 
 static void* game_thread_main(void* arg) {

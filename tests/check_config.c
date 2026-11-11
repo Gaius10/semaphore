@@ -26,6 +26,7 @@ static const char* write_config(const char* contents) {
  * The values differ from each other so that a swapped pair of getters would be caught.
  */
 #define MODE_HUMAN "mode=human\n"
+#define MODE_AI "mode=ai\n"
 #define SPAWN_H "car_spawn_probability_h=0.25\n"
 #define SPAWN_V "car_spawn_probability_v=0.75\n"
 #define ROAD_H "road_length_h=10\n"
@@ -76,8 +77,23 @@ START_TEST(test_config_parses_human_mode) {
 END_TEST
 
 START_TEST(test_config_parses_ai_mode) {
-    ck_assert_int_eq(create_from("mode=ai\n"), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(MODE_AI NO_MODE), CONFIG_STATUS_OK);
     ck_assert_int_eq(config_get_mode(config), MODE_AI_PLAYER);
+    /* The AI plays the same world as the human, so it reads the same keys. */
+    ck_assert_uint_eq(config_get_human_player(config).road_length_h, 10);
+    ck_assert_uint_eq(config_get_human_player(config).road_length_v, 12);
+    ck_assert_int_eq(config_get_view(config).width, 21);
+    ck_assert_uint_eq(config_get_tick_ms(config), 200);
+}
+END_TEST
+
+START_TEST(test_config_ai_mode_needs_the_world_keys) {
+    ck_assert_int_eq(create_from("mode=ai\n"), CONFIG_STATUS_EMISSING);
+}
+END_TEST
+
+START_TEST(test_config_ai_mode_missing_tick_ms) {
+    ck_assert_int_eq(create_from(MODE_AI SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
 }
 END_TEST
 
@@ -177,9 +193,9 @@ START_TEST(test_config_invalid_tick_ms) {
 }
 END_TEST
 
-START_TEST(test_config_other_modes_do_not_need_human_keys) {
+START_TEST(test_config_training_mode_does_not_need_human_keys) {
     /* Only the keys of the chosen mode are required. */
-    ck_assert_int_eq(create_from("mode=ai\n"), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from("mode=training\n"), CONFIG_STATUS_OK);
 }
 END_TEST
 
@@ -296,6 +312,8 @@ Suite* config_suite(void) {
     tcase_add_checked_fixture(tc, setup, teardown);
     tcase_add_test(tc, test_config_parses_human_mode);
     tcase_add_test(tc, test_config_parses_ai_mode);
+    tcase_add_test(tc, test_config_ai_mode_needs_the_world_keys);
+    tcase_add_test(tc, test_config_ai_mode_missing_tick_ms);
     tcase_add_test(tc, test_config_parses_training_mode);
     tcase_add_test(tc, test_config_key_order_does_not_matter);
     tcase_add_test(tc, test_config_skips_comments_and_blank_lines);
@@ -311,7 +329,7 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_human_mode_missing_view_height);
     tcase_add_test(tc, test_config_human_mode_missing_tick_ms);
     tcase_add_test(tc, test_config_invalid_tick_ms);
-    tcase_add_test(tc, test_config_other_modes_do_not_need_human_keys);
+    tcase_add_test(tc, test_config_training_mode_does_not_need_human_keys);
     tcase_add_test(tc, test_config_unknown_mode);
     tcase_add_test(tc, test_config_invalid_probability);
     tcase_add_test(tc, test_config_invalid_sizes);

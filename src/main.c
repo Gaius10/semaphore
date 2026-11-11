@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "config/config.h"
+#include "mode/ai_player.h"
 #include "mode/human_player.h"
 
 static int run(const config_t* config);
@@ -42,13 +43,14 @@ int main(int argc, char** argv) {
 }
 
 static int run(const config_t* config) {
-    if (config_get_mode(config) != MODE_HUMAN_PLAYER) {
+    config_mode_t mode = config_get_mode(config);
+    if (mode != MODE_HUMAN_PLAYER && mode != MODE_AI_PLAYER) {
         printf("Not implemented yet.\n");
-        printf("Only human player mode is currently supported.\n");
+        printf("Only human player and AI player modes are currently supported.\n");
         return 1;
     }
 
-    int _run = mode_run_human_player(config);
+    int _run = mode == MODE_HUMAN_PLAYER ? mode_run_human_player(config) : mode_run_ai_player(config);
     if (_run != 0) {
         printf("Error running game.\n");
         return 1;

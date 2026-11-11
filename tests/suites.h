@@ -10,5 +10,6 @@ Suite* view_suite(void);
 Suite* game_suite(void);
 Suite* input_suite(void);
 Suite* traffic_light_suite(void);
+Suite* ai_suite(void);
 
 #endif

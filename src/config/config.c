@@ -248,7 +248,8 @@ static bool is_complete(const config_t* config) {
         return false;
     }
 
-    if (config->mode == MODE_HUMAN_PLAYER) {
+    /** The AI plays the same world as the human, so both modes need the same keys. */
+    if (config->mode == MODE_HUMAN_PLAYER || config->mode == MODE_AI_PLAYER) {
         return !isnan(config->human_player.car_spawn_probability_h)
             && !isnan(config->human_player.car_spawn_probability_v)
             && config->human_player.road_length_h > 0
