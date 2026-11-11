@@ -15,10 +15,11 @@ struct Game {
     traffic_light_t* horizontal_light;
     traffic_light_t* vertical_light;
     unsigned int crashes;
+    unsigned int cars_passed;
 };
 
 static void apply_command(game_t* game, game_command_t command);
-static void move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy);
+static unsigned int move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy);
 static bool road_has_car_at(const road_t* road, int x, int y);
 static void factory_car(road_t* road, double spawn_probability, int x, int y);
 
@@ -31,6 +32,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
     new_game->config_human_player = config_get_human_player(config);
     new_game->state = GAME_STATE_RUNNING;
     new_game->crashes = 0;
+    new_game->cars_passed = 0;
 
     if (road_create(&new_game->horizontal_road) != ROAD_STATUS_OK) {
         free(new_game);
@@ -112,6 +114,10 @@ unsigned int game_get_crashes(const game_t* game) {
     return game->crashes;
 }
 
+unsigned int game_get_cars_passed(const game_t* game) {
+    return game->cars_passed;
+}
+
 game_state_t game_exec(game_t* game, game_command_t command) {
     if (game->state == GAME_STATE_ENDED) {
         return game->state;
@@ -119,8 +125,8 @@ game_state_t game_exec(game_t* game, game_command_t command) {
 
     apply_command(game, command);
 
-    move_cars_through(game->horizontal_road, game->horizontal_light, 1, 0);
-    move_cars_through(game->vertical_road, game->vertical_light, 0, 1);
+    game->cars_passed += move_cars_through(game->horizontal_road, game->horizontal_light, 1, 0);
+    game->cars_passed += move_cars_through(game->vertical_road, game->vertical_light, 0, 1);
 
     double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
     double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
@@ -155,9 +161,14 @@ static void apply_command(game_t* game, game_command_t command) {
  * The road holds its cars in spawn order, so each car is right behind the one before it in the
  * road. Going front to back, the car ahead has already moved (or waited) when a car checks
  * whether the cell it wants is free.
+ *
+ * Returns how many cars passed the light, i.e. moved out of its light's stop cell this tick.
  */
-static void move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy) {
+static unsigned int move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy) {
     car_t* ahead = NULL;
+    unsigned int passed = 0;
+    int light_x = traffic_light_get_x(light);
+    int light_y = traffic_light_get_y(light);
 
     for (int i = 0; i < road_size(road); i++) {
         car_t* car = NULL;
@@ -174,10 +185,15 @@ static void move_cars_through(road_t* road, const traffic_light_t* light, int dx
             car_wait(car);
         } else {
             car_move(car, dx, dy);
+            if (x == light_x && y == light_y) {
+                passed++;
+            }
         }
 
         ahead = car;
     }
+
+    return passed;
 }
 
 static bool road_has_car_at(const road_t* road, int x, int y) {

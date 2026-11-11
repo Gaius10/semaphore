@@ -56,6 +56,9 @@ const traffic_light_t* game_get_vertical_light(const game_t* game);
 /** How many ticks ended with cars of both roads in the crossing. Crashes do not end the game. */
 unsigned int game_get_crashes(const game_t* game);
 
+/** How many cars have passed a traffic light: a car counts once, when it moves out of its light's stop cell. Starts at 0. */
+unsigned int game_get_cars_passed(const game_t* game);
+
 /**
  * Runs one tick:
  * 1. Applies the command (a toggle flips the light of its road).
