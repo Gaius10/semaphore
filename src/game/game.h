@@ -64,8 +64,9 @@ unsigned int game_get_cars_passed(const game_t* game);
  * 1. Applies the command (a toggle flips the light of its road).
  * 2. Moves every car one cell along its road. A car waits instead when its light holds it
  *    (red, and the car is on the stop cell) or when the car ahead of it is in the way.
- * 3. Counts a crash if both roads have a car in the crossing.
- * 4. Spawns new cars, unless the road's spawn cell is taken by a car that is waiting.
+ * 3. Removes the first car of each road if it went past the end of its road (twice the road length).
+ * 4. Counts a crash if both roads have a car in the crossing.
+ * 5. Spawns new cars, unless the road's spawn cell is taken by a car that is waiting.
  */
 game_state_t game_exec(game_t* game, game_command_t command);
 

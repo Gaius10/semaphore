@@ -20,6 +20,8 @@ struct Game {
 
 static void apply_command(game_t* game, game_command_t command);
 static unsigned int move_cars_through(road_t* road, const traffic_light_t* light, int dx, int dy);
+static void remove_car_past_road_end(road_t* road, unsigned int length_h, unsigned int length_v);
+static bool car_is_at(const car_t* car, int x, int y);
 static bool road_has_car_at(const road_t* road, int x, int y);
 static void factory_car(road_t* road, double spawn_probability, int x, int y);
 
@@ -119,6 +121,11 @@ unsigned int game_get_cars_passed(const game_t* game) {
 }
 
 game_state_t game_exec(game_t* game, game_command_t command) {
+    double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
+    double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
+    unsigned int road_length_h = game->config_human_player.road_length_h;
+    unsigned int road_length_v = game->config_human_player.road_length_v;
+
     if (game->state == GAME_STATE_ENDED) {
         return game->state;
     }
@@ -128,10 +135,8 @@ game_state_t game_exec(game_t* game, game_command_t command) {
     game->cars_passed += move_cars_through(game->horizontal_road, game->horizontal_light, 1, 0);
     game->cars_passed += move_cars_through(game->vertical_road, game->vertical_light, 0, 1);
 
-    double spawn_probability_h = game->config_human_player.car_spawn_probability_h;
-    double spawn_probability_v = game->config_human_player.car_spawn_probability_v;
-    unsigned int road_length_h = game->config_human_player.road_length_h;
-    unsigned int road_length_v = game->config_human_player.road_length_v;
+    remove_car_past_road_end(game->horizontal_road, road_length_h, road_length_v);
+    remove_car_past_road_end(game->vertical_road, road_length_h, road_length_v);
 
     if (road_has_car_at(game->horizontal_road, road_length_h, road_length_v)
             && road_has_car_at(game->vertical_road, road_length_h, road_length_v)) {
@@ -179,7 +184,10 @@ static unsigned int move_cars_through(road_t* road, const traffic_light_t* light
         int x = car_get_x(car);
         int y = car_get_y(car);
         bool held = traffic_light_holds(light, x, y);
-        bool blocked = ahead != NULL && car_get_x(ahead) == x + dx && car_get_y(ahead) == y + dy;
+
+        int next_x = x + dx;
+        int next_y = y + dy;
+        bool blocked = ahead != NULL && car_is_at(ahead, next_x, next_y);
 
         if (held || blocked) {
             car_wait(car);
@@ -196,10 +204,28 @@ static unsigned int move_cars_through(road_t* road, const traffic_light_t* light
     return passed;
 }
 
+static void remove_car_past_road_end(road_t* road, unsigned int length_h, unsigned int length_v) {
+    car_t* first = NULL;
+    if (road_get(road, 0, &first) != ROAD_STATUS_OK) {
+        return; // The road is empty
+    }
+
+    int end_h = (int)length_h;
+    int end_v = (int)length_v;
+
+    if (car_get_x(first) - end_h > end_h || car_get_y(first) - end_v > end_v) {
+        road_remove(road, 0);
+    }
+}
+
+static bool car_is_at(const car_t* car, int x, int y) {
+    return car_get_x(car) == x && car_get_y(car) == y;
+}
+
 static bool road_has_car_at(const road_t* road, int x, int y) {
     for (int i = 0; i < road_size(road); i++) {
         car_t* car = NULL;
-        if (road_get(road, i, &car) == ROAD_STATUS_OK && car_get_x(car) == x && car_get_y(car) == y) {
+        if (road_get(road, i, &car) == ROAD_STATUS_OK && car_is_at(car, x, y)) {
             return true;
         }
     }
