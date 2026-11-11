@@ -11,6 +11,7 @@ OBJS := \
 	build/config.o \
 	build/game.o \
 	build/view.o \
+	build/input.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -19,6 +20,7 @@ LIBS := \
 	src/config/config.h \
 	src/game/game.h \
 	src/game/view.h \
+	src/input/input.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -59,6 +61,9 @@ build/car.o: src/game/entities/car.c $(LIBS)
 build/traffic_light.o: src/game/entities/traffic_light.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/game/entities/traffic_light.c -o build/traffic_light.o
 
+build/input.o: src/input/input.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/input/input.c -o build/input.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -70,6 +75,7 @@ TEST_SRC_OBJS := \
 	build/config.o \
 	build/game.o \
 	build/view.o \
+	build/input.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -81,6 +87,7 @@ TEST_OBJS := \
 	build/tests/check_config.o \
 	build/tests/check_view.o \
 	build/tests/check_game.o \
+	build/tests/check_input.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)
