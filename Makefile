@@ -12,6 +12,7 @@ OBJS := \
 	build/game.o \
 	build/view.o \
 	build/input.o \
+	build/human_player.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -21,6 +22,7 @@ LIBS := \
 	src/game/game.h \
 	src/game/view.h \
 	src/input/input.h \
+	src/mode/human_player.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -63,6 +65,9 @@ build/traffic_light.o: src/game/entities/traffic_light.c $(LIBS)
 
 build/input.o: src/input/input.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/input/input.c -o build/input.o
+
+build/human_player.o: src/mode/human_player.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/mode/human_player.c -o build/human_player.o
 
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
