@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <threads.h>
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>
@@ -22,6 +23,7 @@ typedef struct game_thread_args {
     shared_t* shared;
     game_t* game;
     view_t* view;
+    unsigned int tick_ms;
 } game_thread_args_t;
 
 typedef struct input_thread_args {
@@ -115,7 +117,7 @@ static int mode_run_human_player(const config_t* config) {
     shared_t shared = { .pending_command = GAME_COMMAND_NOOP, .quit = false };
     pthread_mutex_init(&shared.lock, NULL);
 
-    game_thread_args_t game_args = { .shared = &shared, .game = game, .view = view };
+    game_thread_args_t game_args = { .shared = &shared, .game = game, .view = view, .tick_ms = config_get_tick_ms(config) };
     input_thread_args_t input_args = { .shared = &shared, .input = input };
 
     pthread_t game_thread;
@@ -132,7 +134,11 @@ static int mode_run_human_player(const config_t* config) {
     return 0;
 }
 
-/** Ticks the game once per second until the game ends or the player quits. */
+static void sleep_ms(unsigned int ms) {
+    struct timespec time = { .tv_sec = ms / 1000, .tv_nsec = (long) (ms % 1000) * 1000000L };
+    thrd_sleep(&time, NULL);
+}
+
 static void* game_thread_main(void* arg) {
     game_thread_args_t* args = arg;
 
@@ -155,15 +161,13 @@ static void* game_thread_main(void* arg) {
             break;
         }
 
-        sleep(1);
+        sleep_ms(args->tick_ms);
     }
 
-    // Tells the input thread to stop too.
     shared_quit(args->shared);
     return NULL;
 }
 
-/** Turns key presses into commands for the game, until the player quits or the game thread stops. */
 static void* input_thread_main(void* arg) {
     input_thread_args_t* args = arg;
 

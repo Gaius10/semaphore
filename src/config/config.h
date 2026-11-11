@@ -59,7 +59,8 @@ typedef enum config_status {
  * Builds a config from the ini file at `path`. There are no defaults: every key the
  * config needs must be in the file. Required keys are `mode`, plus these when the mode is human:
  * `car_spawn_probability_h`, `car_spawn_probability_v`, `road_length_h`, `road_length_v`,
- * `view_width` and `view_height`. The lengths and the view size must be positive whole numbers.
+ * `view_width`, `view_height` and `tick_ms`. The lengths, the view size and the tick must be
+ * positive whole numbers.
  * Unknown keys are ignored, and key order does not matter.
  *
  * On success, *config holds a new config that must be released with config_destroy.
@@ -75,5 +76,7 @@ void config_destroy(config_t** config);
 config_mode_t config_get_mode(const config_t* config);
 config_human_player_t config_get_human_player(const config_t* config);
 config_view_t config_get_view(const config_t* config);
+/** How long a game tick lasts, in milliseconds. Always positive. */
+unsigned int config_get_tick_ms(const config_t* config);
 
 #endif

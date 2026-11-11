@@ -34,7 +34,8 @@ static void create_game(const char* spawn_probability_h, const char* spawn_proba
         "road_length_h=%d\n"
         "road_length_v=%d\n"
         "view_width=21\n"
-        "view_height=21\n",
+        "view_height=21\n"
+        "tick_ms=200\n",
         spawn_probability_h, spawn_probability_v, ROAD_LENGTH_H, ROAD_LENGTH_V);
     fclose(f);
 

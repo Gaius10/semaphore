@@ -15,6 +15,7 @@ struct Config {
     config_mode_t mode;
     config_human_player_t human_player;
     config_view_t view;
+    unsigned int tick_ms;
 };
 
 /**
@@ -44,6 +45,7 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->human_player.road_length_v = 0;
     new_config->view.width = 0;
     new_config->view.height = 0;
+    new_config->tick_ms = 0;
 
     config_status_t status = parse_file(path, new_config);
     if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {
@@ -79,6 +81,10 @@ config_human_player_t config_get_human_player(const config_t* config) {
 
 config_view_t config_get_view(const config_t* config) {
     return config->view;
+}
+
+unsigned int config_get_tick_ms(const config_t* config) {
+    return config->tick_ms;
 }
 
 static config_status_t parse_file(const char* path, config_t* config) {
@@ -164,6 +170,11 @@ static config_status_t set_config_value(config_t* config, const char* key, const
         return parse_positive_int(value, &config->view.height);
     }
 
+    /** Clock config */
+    if (strcmp(key, "tick_ms") == 0) {
+        return parse_positive_uint(value, INT_MAX, &config->tick_ms);
+    }
+
     /** AI player config */
     // Parse AI player specific configuration options
 
@@ -243,7 +254,8 @@ static bool is_complete(const config_t* config) {
             && config->human_player.road_length_h > 0
             && config->human_player.road_length_v > 0
             && config->view.width > 0
-            && config->view.height > 0;
+            && config->view.height > 0
+            && config->tick_ms > 0;
     }
 
     return true;
