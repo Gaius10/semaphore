@@ -18,6 +18,8 @@ Also there is a evolutionary system model that learns optimal ways to control th
 │   ├── config/                Config file loading (opaque config_t + getters)
 │   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop)
 │   ├── ai/                    The AI player: ai_decide(ai, game) answers with the next command
+│   │                          ai.c picks the agent from the config; each agent has its own file and
+│   │                          struct (noop.c, fixed_toggle.c) behind the interface in agent.h
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
@@ -116,9 +118,25 @@ implemented; `training` is not yet. Both use the same world and view keys.
 
 ### AI mode
 
-With `mode=ai`, an AI picks the command of every tick instead of the keyboard. For now the only AI
-is a NOOP one: it never touches a light, so it only exists to exercise the architecture. There is
-no input in this mode, so stop it with Ctrl-C.
+With `mode=ai`, an AI picks the command of every tick instead of the keyboard. The `agent` key
+says which one, and it is required in this mode:
+
+| `agent`        | Behavior                                                                                  |
+|----------------|-------------------------------------------------------------------------------------------|
+| `noop`         | Never touches a light. It only exists to exercise the architecture.                       |
+| `fixed_toggle` | Swaps which light is green every `toggle_interval_ticks` ticks, ignoring the cars.        |
+
+`fixed_toggle` also needs `toggle_interval_ticks` (a positive whole number): how many ticks a light
+stays green. A swap closes the green light and opens the other one on the next tick, so there is one
+all-red tick in between and the lights are never both green. If the lights are ever in the same
+color (for example the game starting with both green), it fixes that on its first tick, leaving the
+horizontal light green.
+
+There is no input in this mode, so stop it with Ctrl-C.
+
+To add an agent: write `src/ai/<name>.c/.h` with its own struct (an `ai_t base` as the first member)
+and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the config, add a case to
+`ai_create` in `ai.c`, and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
 
 ### Coordinates
 

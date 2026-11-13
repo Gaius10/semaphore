@@ -34,6 +34,9 @@ static const char* write_config(const char* contents) {
 #define VIEW_W "view_width=21\n"
 #define VIEW_H "view_height=15\n"
 #define TICK "tick_ms=200\n"
+#define AGENT_NOOP "agent=noop\n"
+#define AGENT_FIXED "agent=fixed_toggle\n"
+#define INTERVAL "toggle_interval_ticks=5\n"
 #define NO_MODE SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H TICK
 #define FULL_HUMAN MODE_HUMAN NO_MODE
 
@@ -77,8 +80,9 @@ START_TEST(test_config_parses_human_mode) {
 END_TEST
 
 START_TEST(test_config_parses_ai_mode) {
-    ck_assert_int_eq(create_from(MODE_AI NO_MODE), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP NO_MODE), CONFIG_STATUS_OK);
     ck_assert_int_eq(config_get_mode(config), MODE_AI_PLAYER);
+    ck_assert_int_eq(config_get_ai_player(config).agent, CONFIG_AGENT_NOOP);
     /* The AI plays the same world as the human, so it reads the same keys. */
     ck_assert_uint_eq(config_get_human_player(config).road_length_h, 10);
     ck_assert_uint_eq(config_get_human_player(config).road_length_v, 12);
@@ -93,7 +97,40 @@ START_TEST(test_config_ai_mode_needs_the_world_keys) {
 END_TEST
 
 START_TEST(test_config_ai_mode_missing_tick_ms) {
-    ck_assert_int_eq(create_from(MODE_AI SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
+    ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H), CONFIG_STATUS_EMISSING);
+}
+END_TEST
+
+START_TEST(test_config_ai_mode_needs_an_agent) {
+    ck_assert_int_eq(create_from(MODE_AI NO_MODE), CONFIG_STATUS_EMISSING);
+}
+END_TEST
+
+START_TEST(test_config_invalid_agent) {
+    ck_assert_int_eq(create_from(MODE_AI "agent=genius\n" NO_MODE), CONFIG_STATUS_EPARSE);
+}
+END_TEST
+
+START_TEST(test_config_parses_fixed_toggle_agent) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_FIXED INTERVAL NO_MODE), CONFIG_STATUS_OK);
+    ck_assert_int_eq(config_get_ai_player(config).agent, CONFIG_AGENT_FIXED_TOGGLE);
+    ck_assert_uint_eq(config_get_ai_player(config).toggle_interval_ticks, 5);
+}
+END_TEST
+
+START_TEST(test_config_fixed_toggle_needs_an_interval) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_FIXED NO_MODE), CONFIG_STATUS_EMISSING);
+}
+END_TEST
+
+START_TEST(test_config_invalid_toggle_interval) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_FIXED "toggle_interval_ticks=0\n" NO_MODE), CONFIG_STATUS_EPARSE);
+    ck_assert_int_eq(create_from(MODE_AI AGENT_FIXED "toggle_interval_ticks=-2\n" NO_MODE), CONFIG_STATUS_EPARSE);
+}
+END_TEST
+
+START_TEST(test_config_noop_agent_does_not_need_an_interval) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP NO_MODE), CONFIG_STATUS_OK);
 }
 END_TEST
 
@@ -314,6 +351,12 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_parses_ai_mode);
     tcase_add_test(tc, test_config_ai_mode_needs_the_world_keys);
     tcase_add_test(tc, test_config_ai_mode_missing_tick_ms);
+    tcase_add_test(tc, test_config_ai_mode_needs_an_agent);
+    tcase_add_test(tc, test_config_invalid_agent);
+    tcase_add_test(tc, test_config_parses_fixed_toggle_agent);
+    tcase_add_test(tc, test_config_fixed_toggle_needs_an_interval);
+    tcase_add_test(tc, test_config_invalid_toggle_interval);
+    tcase_add_test(tc, test_config_noop_agent_does_not_need_an_interval);
     tcase_add_test(tc, test_config_parses_training_mode);
     tcase_add_test(tc, test_config_key_order_does_not_matter);
     tcase_add_test(tc, test_config_skips_comments_and_blank_lines);

@@ -14,6 +14,7 @@
 struct Config {
     config_mode_t mode;
     config_human_player_t human_player;
+    config_ai_player_t ai_player;
     config_view_t view;
     unsigned int tick_ms;
 };
@@ -23,6 +24,8 @@ struct Config {
  * enum: a config returned by config_create never has it. Must stay past the last config_mode_t.
  */
 #define MODE_UNSET (MODE_TRAINING + 1)
+/** Same idea for the agent. Must stay past the last config_agent_t. */
+#define AGENT_UNSET (CONFIG_AGENT_FIXED_TOGGLE + 1)
 
 static config_status_t parse_file(const char* path, config_t* config);
 static config_status_t set_config_value(config_t* config, const char* key, const char* value);
@@ -43,6 +46,8 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->human_player.car_spawn_probability_v = NAN;
     new_config->human_player.road_length_h = 0; // Valid sizes are positive, so 0 is unset
     new_config->human_player.road_length_v = 0;
+    new_config->ai_player.agent = AGENT_UNSET;
+    new_config->ai_player.toggle_interval_ticks = 0;
     new_config->view.width = 0;
     new_config->view.height = 0;
     new_config->tick_ms = 0;
@@ -77,6 +82,10 @@ config_mode_t config_get_mode(const config_t* config) {
 
 config_human_player_t config_get_human_player(const config_t* config) {
     return config->human_player;
+}
+
+config_ai_player_t config_get_ai_player(const config_t* config) {
+    return config->ai_player;
 }
 
 config_view_t config_get_view(const config_t* config) {
@@ -176,7 +185,21 @@ static config_status_t set_config_value(config_t* config, const char* key, const
     }
 
     /** AI player config */
-    // Parse AI player specific configuration options
+    if (strcmp(key, "agent") == 0) {
+        if (strcmp(value, "noop") == 0) {
+            config->ai_player.agent = CONFIG_AGENT_NOOP;
+        } else if (strcmp(value, "fixed_toggle") == 0) {
+            config->ai_player.agent = CONFIG_AGENT_FIXED_TOGGLE;
+        } else {
+            return CONFIG_STATUS_EPARSE;
+        }
+
+        return CONFIG_STATUS_OK;
+    }
+
+    if (strcmp(key, "toggle_interval_ticks") == 0) {
+        return parse_positive_uint(value, INT_MAX, &config->ai_player.toggle_interval_ticks);
+    }
 
     /** Training config */
     // Parse training specific configuration options
@@ -249,6 +272,16 @@ static bool is_complete(const config_t* config) {
     }
 
     /** The AI plays the same world as the human, so both modes need the same keys. */
+    if (config->mode == MODE_AI_PLAYER) {
+        if (config->ai_player.agent == AGENT_UNSET) {
+            return false;
+        }
+
+        if (config->ai_player.agent == CONFIG_AGENT_FIXED_TOGGLE && config->ai_player.toggle_interval_ticks == 0) {
+            return false;
+        }
+    }
+
     if (config->mode == MODE_HUMAN_PLAYER || config->mode == MODE_AI_PLAYER) {
         return !isnan(config->human_player.car_spawn_probability_h)
             && !isnan(config->human_player.car_spawn_probability_v)

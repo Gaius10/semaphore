@@ -8,8 +8,9 @@
  * The AI that plays the game in AI mode. It only looks at the game and answers with the command
  * it wants to run on the next tick, so the mode decides when to ask and what to do with the answer.
  *
- * For now there is a single AI, and it never does anything (it always answers
- * GAME_COMMAND_NOOP). It exists to exercise the architecture around it.
+ * The config's `agent` picks which agent plays. Each agent lives in its own file with its own
+ * struct (noop.c, fixed_toggle.c) and implements the interface in agent.h; ai_create builds the
+ * right one and the rest of the game only sees this header.
  */
 typedef struct Ai ai_t;
 
@@ -18,6 +19,8 @@ typedef enum ai_status {
     AI_STATUS_OK,
     /** Memory allocation failed (ai_create). */
     AI_STATUS_ENOMEM,
+    /** The config is not for an AI that exists (ai_create). */
+    AI_STATUS_EAGENT,
 } ai_status_t;
 
 /**

@@ -15,6 +15,8 @@ OBJS := \
 	build/human_player.o \
 	build/ai_player.o \
 	build/ai.o \
+	build/noop.o \
+	build/fixed_toggle.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -28,6 +30,9 @@ LIBS := \
 	src/mode/ai_player.h \
 	src/mode/sleep.h \
 	src/ai/ai.h \
+	src/ai/agent.h \
+	src/ai/noop.h \
+	src/ai/fixed_toggle.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -80,6 +85,12 @@ build/ai_player.o: src/mode/ai_player.c $(LIBS)
 build/ai.o: src/ai/ai.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/ai/ai.c -o build/ai.o
 
+build/noop.o: src/ai/noop.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/ai/noop.c -o build/noop.o
+
+build/fixed_toggle.o: src/ai/fixed_toggle.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/ai/fixed_toggle.c -o build/fixed_toggle.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -93,6 +104,8 @@ TEST_SRC_OBJS := \
 	build/view.o \
 	build/input.o \
 	build/ai.o \
+	build/noop.o \
+	build/fixed_toggle.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -106,6 +119,8 @@ TEST_OBJS := \
 	build/tests/check_game.o \
 	build/tests/check_input.o \
 	build/tests/check_ai.o \
+	build/tests/check_noop.o \
+	build/tests/check_fixed_toggle.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)
@@ -114,7 +129,7 @@ test: $(TEST_TARGET)
 $(TEST_TARGET): $(TEST_OBJS) $(TEST_SRC_OBJS)
 	$(CC) $(LDFLAGS) $(TEST_OBJS) $(TEST_SRC_OBJS) -o $@ $(CHECK_LIBS)
 
-build/tests/%.o: tests/%.c tests/suites.h $(LIBS)
+build/tests/%.o: tests/%.c tests/suites.h tests/ai_fixture.h $(LIBS)
 	@mkdir -p build/tests
 	$(CC) $(CFLAGS) $(CHECK_CFLAGS) -c $< -o $@
 
