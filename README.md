@@ -5,7 +5,7 @@ A multithreaded C simulation of a traffic intersection controlled by semaphores 
 ## Overview
 
 This application simulates a traffic intersection where cars arrive from two perpendicular roads (horizontal and vertical).
-Also there is a evolutionary system model that learns optimal ways to control the traffic lights.
+Also there is an evolutionary system model that learns optimal ways to control the traffic lights.
 
 ## Project Structure
 
@@ -16,10 +16,12 @@ Also there is a evolutionary system model that learns optimal ways to control th
 ├── src/
 │   ├── main.c                 Entry point: loads the config and starts the mode it asks for
 │   ├── config/                Config file loading (opaque config_t + getters)
+│   ├── input/                 Keyboard input: single key presses, without waiting for Enter
 │   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop)
 │   ├── ai/                    The AI player: ai_decide(ai, game) answers with the next command
 │   │                          ai.c picks the agent from the config; each agent has its own file and
-│   │                          struct (noop.c, fixed_toggle.c) behind the interface in agent.h
+│   │                          struct (noop.c, fixed_toggle.c, linear_combination.c) behind the
+│   │                          interface in agent.h
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
@@ -56,7 +58,8 @@ Run the unit tests (from the repository root):
 make test
 ```
 
-The tests cover `car`, `road`, `traffic_light`, `config`, `view` and `game`, and live in `tests/check_*.c`. Each module has its own
+The tests cover `car`, `road`, `traffic_light`, `config`, `view`, `game`, `input`, `ai` (the dispatch), and the
+`noop` and `fixed_toggle` agents, and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
@@ -88,9 +91,10 @@ Settings live in an ini-style file, `config.ini`. Lines starting with `#` or `;`
 
 ```ini
 [game]
-mode=human
+mode=ai
+tick_ms=200
 
-[human_player]
+[human_player | ai_player]
 car_spawn_probability_h=0.5
 car_spawn_probability_v=0.5
 road_length_h=10
@@ -99,22 +103,46 @@ road_length_v=10
 [view]
 view_width=21
 view_height=21
+
+[ai_player]
+; agent: noop | fixed_toggle
+agent=fixed_toggle
+toggle_interval_ticks=10
 ```
 
-| Key                       | Required          | Description                                                              |
-|---------------------------|-------------------|--------------------------------------------------------------------------|
-| `mode`                    | always            | `human`, `ai` or `training`                                              |
-| `car_spawn_probability_h` | when `mode=human` or `ai` | Chance of a car spawning on the horizontal road each tick                |
-| `car_spawn_probability_v` | when `mode=human` or `ai` | Chance of a car spawning on the vertical road each tick                  |
-| `road_length_h`           | when `mode=human` or `ai` | Length of the horizontal road, in cars (a positive whole number)         |
-| `road_length_v`           | when `mode=human` or `ai` | Length of the vertical road, in cars (a positive whole number)           |
-| `view_width`              | when `mode=human` or `ai` | Width of the terminal view, in cells (a positive whole number)           |
-| `view_height`             | when `mode=human` or `ai` | Height of the terminal view, in cells (a positive whole number)          |
+| Key                       | Required                  | Description                                                                |
+|---------------------------|---------------------------|----------------------------------------------------------------------------|
+| `mode`                    | always                    | `human`, `ai` or `training`                                                |
+| `car_spawn_probability_h` | when `mode=human` or `ai` | Chance of a car spawning on the horizontal road each tick                  |
+| `car_spawn_probability_v` | when `mode=human` or `ai` | Chance of a car spawning on the vertical road each tick                    |
+| `road_length_h`           | when `mode=human` or `ai` | Length of the horizontal road, in cars (a positive whole number)           |
+| `road_length_v`           | when `mode=human` or `ai` | Length of the vertical road, in cars (a positive whole number)             |
+| `view_width`              | when `mode=human` or `ai` | Width of the terminal view, in cells (a positive whole number)             |
+| `view_height`             | when `mode=human` or `ai` | Height of the terminal view, in cells (a positive whole number)            |
+| `tick_ms`                 | when `mode=human` or `ai` | How long a game tick lasts, in milliseconds (a positive whole number)      |
+| `agent`                   | when `mode=ai`            | Which AI plays: `noop` or `fixed_toggle` (see [AI mode](#ai-mode))         |
+| `toggle_interval_ticks`   | when `agent=fixed_toggle` | Ticks a light stays green before the lights swap (a positive whole number) |
 
 There are no defaults: a missing required key is an error, and so is a value that is not valid for
 its key (an unknown `mode`, a probability that is not a number, or a length or size that is not a
 positive whole number). Unknown keys are ignored and key order does not matter. `human` and `ai` modes are
-implemented; `training` is not yet. Both use the same world and view keys.
+implemented; `training` is not yet. Both use the same world, view and tick keys.
+
+`binarization_method` (only `threshold`) and `threshold` (a number) are also read, for the
+`linear_combination` agent. That agent is not finished: `agent=linear_combination` is not accepted
+yet, so these two keys have no effect for now.
+
+### Human mode
+
+With `mode=human`, you control the lights with the keyboard. A key press is read without waiting
+for Enter, and applies on the next tick. If you press more than one key within a tick, only the last
+one counts:
+
+| Key            | Action                                  |
+|----------------|-----------------------------------------|
+| `h`            | Flip the horizontal road's light        |
+| `v`            | Flip the vertical road's light          |
+| `q` or Ctrl-C  | Quit                                    |
 
 ### AI mode
 
@@ -127,16 +155,21 @@ says which one, and it is required in this mode:
 | `fixed_toggle` | Swaps which light is green every `toggle_interval_ticks` ticks, ignoring the cars.        |
 
 `fixed_toggle` also needs `toggle_interval_ticks` (a positive whole number): how many ticks a light
-stays green. A swap closes the green light and opens the other one on the next tick, so there is one
-all-red tick in between and the lights are never both green. If the lights are ever in the same
-color (for example the game starting with both green), it fixes that on its first tick, leaving the
-horizontal light green.
+stays green. A swap closes the green light and opens the other one in the same tick, so the lights
+are never both green. If the lights are ever in the same color, it fixes that on its first tick,
+leaving the horizontal light green. This always happens at the start of a game, since both lights
+start green.
 
 There is no input in this mode, so stop it with Ctrl-C.
 
 To add an agent: write `src/ai/<name>.c/.h` with its own struct (an `ai_t base` as the first member)
 and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the config, add a case to
-`ai_create` in `ai.c`, and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
+`ai_create` in `ai.c`, add its object to `OBJS`, `LIBS` and `TEST_SRC_OBJS` in the Makefile (with a
+build rule), and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
+
+`linear_combination.c` is a skeleton for a future agent that decides each light from a linear
+combination of the cars' distances to it. It is built and linked, and `ai_create` has a case for it,
+but no `agent=` value selects it yet and its `decide` is not implemented.
 
 ### Coordinates
 
@@ -148,10 +181,13 @@ as the roads.
 
 ## Traffic Lights
 
-The roads cross at `(road_length_h, road_length_v)`, and each road has its own traffic light. The
-horizontal light starts green and the vertical one starts red. The game commands
-`GAME_COMMAND_HORIZONTAL_TOGGLE` and `GAME_COMMAND_VERTICAL_TOGGLE` switch a light between green and red.
-For now the simulation only sends `GAME_COMMAND_NOOP`: there is no keyboard control yet.
+The roads cross at `(road_length_h, road_length_v)`, and each road has its own traffic light. Both
+lights start green. A game command (`game_command_t`) is the whole controllable state of the game as
+it should be from that tick on: the color of each light. It is a state, not a change, so running it
+twice gives the same result. To leave the game alone, send the colors the lights already show; to
+change one light, change only its color. The human mode does this for the `h` and `v` keys (flip that
+light), and the AIs build their commands the same way (`agent_current_command` in `src/ai/agent.h`
+gives them the current state).
 
 Each light has a stop cell, the last cell of its road before the crossing:
 `(road_length_h - 1, road_length_v)` for the horizontal road and `(road_length_h, road_length_v - 1)`
@@ -161,10 +197,14 @@ for the vertical one. On every tick:
 2. Every car moves one cell, except a car on its stop cell while the light is red, and a car whose
    next cell is taken by the car ahead of it. Those wait, so a red light builds a queue. Cars
    already in the crossing or past it never stop.
-3. If both roads have a car in the crossing, the game counts a crash (`game_get_crashes`). The game
+3. The first car of each road is removed once it is past the end of its road (twice the road length).
+4. If both roads have a car in the crossing, the game counts a crash (`game_get_crashes`). The game
    keeps running.
-4. New cars spawn, unless the queue reaches back to the spawn cell. A road therefore holds at most
+5. New cars spawn, unless the queue reaches back to the spawn cell. A road therefore holds at most
    its length in cars before the crossing.
+
+The game also counts the cars that have passed a light (`game_get_cars_passed`): a car counts once,
+when it moves out of its light's stop cell.
 
 Both lights can be green at the same time, so it is up to the player to avoid crashes.
 

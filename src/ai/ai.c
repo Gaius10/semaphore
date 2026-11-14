@@ -20,6 +20,13 @@ ai_status_t ai_create(const config_t* config, ai_t** ai) {
     return AI_STATUS_EAGENT;
 }
 
+game_command_t agent_current_command(const game_t* game) {
+    return (game_command_t) {
+        .horizontal_light = traffic_light_get_color(game_get_horizontal_light(game)),
+        .vertical_light = traffic_light_get_color(game_get_vertical_light(game)),
+    };
+}
+
 void ai_destroy(ai_t** ai) {
     if (ai == NULL || *ai == NULL) {
         return;

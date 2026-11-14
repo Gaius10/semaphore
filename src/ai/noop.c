@@ -11,9 +11,8 @@ typedef struct {
 
 static game_command_t noop_decide(ai_t* ai, const game_t* game) {
     (void) ai;
-    (void) game;
 
-    return GAME_COMMAND_NOOP;
+    return agent_current_command(game);
 }
 
 static void noop_destroy(ai_t* ai) {

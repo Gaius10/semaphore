@@ -13,21 +13,15 @@ typedef struct Input input_t;
 
 /** What the key pressed means. */
 typedef enum input_action {
-    /** No key was pressed in time (see input_read), or the key is not bound to anything. */
-    INPUT_ACTION_NONE,
-    /** Key 'h'. */
-    INPUT_ACTION_HORIZONTAL_TOGGLE,
-    /** Key 'v'. */
-    INPUT_ACTION_VERTICAL_TOGGLE,
-    /** Key 'q', Ctrl-C, or the end of a file or pipe. */
-    INPUT_ACTION_QUIT,
+    INPUT_ACTION_NONE,              // No key was pressed in time (see input_read), or the key is not bound to anything.
+    INPUT_ACTION_HORIZONTAL_TOGGLE, // Key 'h'.
+    INPUT_ACTION_VERTICAL_TOGGLE,   // Key 'v'.
+    INPUT_ACTION_QUIT,              // Key 'q', Ctrl-C, or the end of a file or pipe.
 } input_action_t;
 
 typedef enum input_status {
-    /** The operation completed successfully. */
-    INPUT_STATUS_OK,
-    /** Memory allocation failed (input_create). */
-    INPUT_STATUS_ENOMEM,
+    INPUT_STATUS_OK,     // The operation completed successfully.
+    INPUT_STATUS_ENOMEM, // Memory allocation failed (input_create).
 } input_status_t;
 
 /**

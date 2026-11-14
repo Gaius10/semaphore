@@ -43,6 +43,14 @@ traffic_light_color_t traffic_light_get_color(const traffic_light_t* light) {
     return light->color;
 }
 
+void traffic_light_set_color(traffic_light_t* light, traffic_light_color_t color) {
+    if (light == NULL) {
+        return;
+    }
+
+    light->color = color;
+}
+
 void traffic_light_toggle(traffic_light_t* light) {
     if (light == NULL) {
         return;

@@ -8,14 +8,10 @@
 typedef struct Road road_t;
 
 typedef enum road_status {
-    /** The operation completed successfully. */
-    ROAD_STATUS_OK,
-    /** Memory allocation failed (road_create). */
-    ROAD_STATUS_ENOMEM,
-    /** The road already holds ROAD_MAX_SIZE cars (road_append). */
-    ROAD_STATUS_EFULL,
-    /** The index is negative or not lower than the road size (road_remove, road_get). */
-    ROAD_STATUS_EINDEX,
+    ROAD_STATUS_OK,     // The operation completed successfully.
+    ROAD_STATUS_ENOMEM, // Memory allocation failed (road_create).
+    ROAD_STATUS_EFULL,  // The road already holds ROAD_MAX_SIZE cars (road_append).
+    ROAD_STATUS_EINDEX, // The index is negative or not lower than the road size (road_remove, road_get).
 } road_status_t;
 
 /** On success, *road holds a new road that must be released with road_destroy. */

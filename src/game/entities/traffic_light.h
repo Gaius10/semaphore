@@ -17,10 +17,8 @@ typedef enum traffic_light_color {
 } traffic_light_color_t;
 
 typedef enum traffic_light_status {
-    /** The operation completed successfully. */
-    TRAFFIC_LIGHT_STATUS_OK,
-    /** Memory allocation failed (traffic_light_create). */
-    TRAFFIC_LIGHT_STATUS_ENOMEM,
+    TRAFFIC_LIGHT_STATUS_OK,     // The operation completed successfully.
+    TRAFFIC_LIGHT_STATUS_ENOMEM, // Memory allocation failed (traffic_light_create).
 } traffic_light_status_t;
 
 /**
@@ -33,6 +31,9 @@ void traffic_light_destroy(traffic_light_t** light);
 int traffic_light_get_x(const traffic_light_t* light);
 int traffic_light_get_y(const traffic_light_t* light);
 traffic_light_color_t traffic_light_get_color(const traffic_light_t* light);
+
+/** Makes the light show `color`. Does nothing if `light` is NULL. */
+void traffic_light_set_color(traffic_light_t* light, traffic_light_color_t color);
 
 /** Green becomes red and red becomes green. Does nothing if `light` is NULL. */
 void traffic_light_toggle(traffic_light_t* light);

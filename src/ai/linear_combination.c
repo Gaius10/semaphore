@@ -41,11 +41,8 @@ static game_command_t linear_combination_decide(ai_t* ai, const game_t* game) {
     /**
      * @todo
      *
-     * This implementation will demand a new system of commands.
-     * The system will be able to change the entire controllable
-     * state of the game at once, not just the traffic lights.
-     * 
-     * e.g. each command will be a new state of the game, not a 
-     * single change.
+     * Commands are now whole states (see game_command_t), so this agent can return the complete
+     * state it wants, e.g. the lights picked from a linear combination of the road distances.
+     * Not implemented yet.
      */
 }

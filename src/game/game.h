@@ -7,11 +7,18 @@
 
 typedef struct Game game_t;
 
-/** What the player does on a tick. Each toggle flips the light of its road. */
-typedef enum GAME_COMMAND {
-    GAME_COMMAND_NOOP,
-    GAME_COMMAND_HORIZONTAL_TOGGLE,
-    GAME_COMMAND_VERTICAL_TOGGLE,
+/**
+ * What the player does on a tick: the whole controllable state of the game, as it should be from
+ * this tick on. A command is not a change, so it does not depend on what the game shows now:
+ * running the same command twice leaves the game in the same state. Today the only thing the
+ * player controls is the color of each road's traffic light.
+ *
+ * To leave the game as it is, send the state it already shows (read it with
+ * game_get_horizontal_light and game_get_vertical_light).
+ */
+typedef struct game_command {
+    traffic_light_color_t horizontal_light;
+    traffic_light_color_t vertical_light;
 } game_command_t;
 
 typedef enum {
@@ -21,10 +28,8 @@ typedef enum {
 
 /** Outcome of a game operation (the game's own state is game_state_t). */
 typedef enum game_status {
-    /** The operation completed successfully. */
-    GAME_STATUS_OK,
-    /** Memory allocation failed (game_create). */
-    GAME_STATUS_ENOMEM,
+    GAME_STATUS_OK,     // The operation completed successfully.
+    GAME_STATUS_ENOMEM, // Memory allocation failed (game_create).
 } game_status_t;
 
 /**
@@ -45,10 +50,9 @@ const road_t* game_get_vertical_road(const game_t* game);
 
 /**
  * Read-only access to the roads' traffic lights. Like the roads, the pointers stay owned by the
- * game and are valid until game_destroy. The horizontal light starts green and the vertical one
- * starts red. The horizontal stop cell is (road_length_h - 1, road_length_v) and the vertical
- * one is (road_length_h, road_length_v - 1), right before the crossing at
- * (road_length_h, road_length_v).
+ * game and are valid until game_destroy. Both lights start green. The horizontal stop cell is
+ * (road_length_h - 1, road_length_v) and the vertical one is (road_length_h, road_length_v - 1),
+ * right before the crossing at (road_length_h, road_length_v).
  */
 const traffic_light_t* game_get_horizontal_light(const game_t* game);
 const traffic_light_t* game_get_vertical_light(const game_t* game);
@@ -61,7 +65,7 @@ unsigned int game_get_cars_passed(const game_t* game);
 
 /**
  * Runs one tick:
- * 1. Applies the command (a toggle flips the light of its road).
+ * 1. Applies the command (each light takes the color the command gives it).
  * 2. Moves every car one cell along its road. A car waits instead when its light holds it
  *    (red, and the car is on the stop cell) or when the car ahead of it is in the way.
  * 3. Removes the first car of each road if it went past the end of its road (twice the road length).

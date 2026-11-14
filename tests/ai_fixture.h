@@ -72,12 +72,7 @@ static bool v_green(void) {
  * the tests do not depend on how the game happens to set them up.
  */
 static void start_h_green_v_red(void) {
-    if (!h_green()) {
-        game_exec(game, GAME_COMMAND_HORIZONTAL_TOGGLE);
-    }
-    if (v_green()) {
-        game_exec(game, GAME_COMMAND_VERTICAL_TOGGLE);
-    }
+    game_exec(game, (game_command_t) { .horizontal_light = TRAFFIC_LIGHT_GREEN, .vertical_light = TRAFFIC_LIGHT_RED });
 }
 
 #endif

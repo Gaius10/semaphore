@@ -22,4 +22,7 @@ struct Ai {
     const agent_ops_t* ops;
 };
 
+/** The command that changes nothing: the lights as the game shows them right now. */
+game_command_t agent_current_command(const game_t* game);
+
 #endif

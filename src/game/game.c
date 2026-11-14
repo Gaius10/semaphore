@@ -150,16 +150,8 @@ game_state_t game_exec(game_t* game, game_command_t command) {
 }
 
 static void apply_command(game_t* game, game_command_t command) {
-    switch (command) {
-        case GAME_COMMAND_HORIZONTAL_TOGGLE:
-            traffic_light_toggle(game->horizontal_light);
-            break;
-        case GAME_COMMAND_VERTICAL_TOGGLE:
-            traffic_light_toggle(game->vertical_light);
-            break;
-        case GAME_COMMAND_NOOP:
-            break;
-    }
+    traffic_light_set_color(game->horizontal_light, command.horizontal_light);
+    traffic_light_set_color(game->vertical_light, command.vertical_light);
 }
 
 /**

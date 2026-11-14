@@ -12,7 +12,8 @@
 /** State shared by the game thread and the input thread. */
 typedef struct shared {
     pthread_mutex_t lock;
-    game_command_t pending_command;
+    /** The last toggle key pressed since the last tick (INPUT_ACTION_NONE if none). */
+    input_action_t pending_action;
     bool quit;
 } shared_t;
 
@@ -30,6 +31,8 @@ typedef struct input_thread_args {
 
 static void* game_thread_main(void* arg);
 static void* input_thread_main(void* arg);
+static game_command_t command_for(input_action_t action, const game_t* game);
+static traffic_light_color_t opposite(traffic_light_color_t color);
 static bool shared_should_quit(shared_t* shared);
 static void shared_quit(shared_t* shared);
 
@@ -59,7 +62,7 @@ int mode_run_human_player(const config_t* config) {
         return 1;
     }
 
-    shared_t shared = { .pending_command = GAME_COMMAND_NOOP, .quit = false };
+    shared_t shared = { .pending_action = INPUT_ACTION_NONE, .quit = false };
     pthread_mutex_init(&shared.lock, NULL);
 
     game_thread_args_t game_args = { .shared = &shared, .game = game, .view = view, .tick_ms = config_get_tick_ms(config) };
@@ -84,9 +87,11 @@ static void* game_thread_main(void* arg) {
 
     while (!shared_should_quit(args->shared)) {
         pthread_mutex_lock(&args->shared->lock);
-        game_command_t command = args->shared->pending_command;
-        args->shared->pending_command = GAME_COMMAND_NOOP;
+        input_action_t action = args->shared->pending_action;
+        args->shared->pending_action = INPUT_ACTION_NONE;
         pthread_mutex_unlock(&args->shared->lock);
+
+        game_command_t command = command_for(action, args->game);
 
         game_state_t state = game_exec(args->game, command);
         view_render(
@@ -118,14 +123,32 @@ static void* input_thread_main(void* arg) {
             shared_quit(args->shared);
         } else if (action == INPUT_ACTION_HORIZONTAL_TOGGLE || action == INPUT_ACTION_VERTICAL_TOGGLE) {
             pthread_mutex_lock(&args->shared->lock);
-            args->shared->pending_command = action == INPUT_ACTION_HORIZONTAL_TOGGLE
-                ? GAME_COMMAND_HORIZONTAL_TOGGLE
-                : GAME_COMMAND_VERTICAL_TOGGLE;
+            args->shared->pending_action = action;
             pthread_mutex_unlock(&args->shared->lock);
         }
     }
 
     return NULL;
+}
+
+/** A key press toggles one light, so the command is the current state with that light flipped. */
+static game_command_t command_for(input_action_t action, const game_t* game) {
+    game_command_t command = {
+        .horizontal_light = traffic_light_get_color(game_get_horizontal_light(game)),
+        .vertical_light = traffic_light_get_color(game_get_vertical_light(game)),
+    };
+
+    if (action == INPUT_ACTION_HORIZONTAL_TOGGLE) {
+        command.horizontal_light = opposite(command.horizontal_light);
+    } else if (action == INPUT_ACTION_VERTICAL_TOGGLE) {
+        command.vertical_light = opposite(command.vertical_light);
+    }
+
+    return command;
+}
+
+static traffic_light_color_t opposite(traffic_light_color_t color) {
+    return color == TRAFFIC_LIGHT_GREEN ? TRAFFIC_LIGHT_RED : TRAFFIC_LIGHT_GREEN;
 }
 
 static bool shared_should_quit(shared_t* shared) {

@@ -5,10 +5,8 @@
 typedef struct Car car_t;
 
 typedef enum car_status {
-    /** The operation completed successfully. */
-    CAR_STATUS_OK,
-    /** Memory allocation failed (car_create). */
-    CAR_STATUS_ENOMEM,
+    CAR_STATUS_OK,     // The operation completed successfully.
+    CAR_STATUS_ENOMEM, // Memory allocation failed (car_create).
 } car_status_t;
 
 /** On success, *car holds a new car that must be released with car_destroy. */

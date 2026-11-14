@@ -31,6 +31,18 @@ START_TEST(test_traffic_light_toggle_flips_the_color) {
 }
 END_TEST
 
+START_TEST(test_traffic_light_set_color_is_not_a_toggle) {
+    traffic_light_set_color(light, TRAFFIC_LIGHT_RED);
+    ck_assert_int_eq(traffic_light_get_color(light), TRAFFIC_LIGHT_RED);
+
+    traffic_light_set_color(light, TRAFFIC_LIGHT_GREEN);
+    traffic_light_set_color(light, TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_color(light), TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_x(light), 2);
+    ck_assert_int_eq(traffic_light_get_y(light), 3);
+}
+END_TEST
+
 START_TEST(test_traffic_light_toggle_keeps_the_stop_cell) {
     traffic_light_toggle(light);
 
@@ -70,6 +82,7 @@ START_TEST(test_traffic_light_null_safe_functions) {
     traffic_light_t* none = NULL;
 
     traffic_light_toggle(NULL);
+    traffic_light_set_color(NULL, TRAFFIC_LIGHT_GREEN);
     traffic_light_destroy(&none);
     traffic_light_destroy(NULL);
     ck_assert(!traffic_light_holds(NULL, 0, 0));
@@ -83,6 +96,7 @@ Suite* traffic_light_suite(void) {
     tcase_add_checked_fixture(tc, setup, teardown);
     tcase_add_test(tc, test_traffic_light_create_sets_initial_state);
     tcase_add_test(tc, test_traffic_light_toggle_flips_the_color);
+    tcase_add_test(tc, test_traffic_light_set_color_is_not_a_toggle);
     tcase_add_test(tc, test_traffic_light_toggle_keeps_the_stop_cell);
     tcase_add_test(tc, test_traffic_light_red_holds_the_stop_cell);
     tcase_add_test(tc, test_traffic_light_green_holds_nothing);

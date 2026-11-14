@@ -41,12 +41,9 @@
 typedef struct View view_t;
 
 typedef enum view_status {
-    /** The operation completed successfully. */
-    VIEW_STATUS_OK,
-    /** Memory allocation failed (view_create). */
-    VIEW_STATUS_ENOMEM,
-    /** The width or the height is zero (view_create). */
-    VIEW_STATUS_EINVAL,
+    VIEW_STATUS_OK,     // The operation completed successfully.
+    VIEW_STATUS_ENOMEM, // Memory allocation failed (view_create).
+    VIEW_STATUS_EINVAL, // The width or the height is zero (view_create).
 } view_status_t;
 
 /**
