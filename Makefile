@@ -17,6 +17,7 @@ OBJS := \
 	build/ai.o \
 	build/noop.o \
 	build/fixed_toggle.o \
+	build/linear_combination.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -33,6 +34,7 @@ LIBS := \
 	src/ai/agent.h \
 	src/ai/noop.h \
 	src/ai/fixed_toggle.h \
+	src/ai/linear_combination.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -91,6 +93,9 @@ build/noop.o: src/ai/noop.c $(LIBS)
 build/fixed_toggle.o: src/ai/fixed_toggle.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/ai/fixed_toggle.c -o build/fixed_toggle.o
 
+build/linear_combination.o: src/ai/linear_combination.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/ai/linear_combination.c -o build/linear_combination.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -106,6 +111,7 @@ TEST_SRC_OBJS := \
 	build/ai.o \
 	build/noop.o \
 	build/fixed_toggle.o \
+	build/linear_combination.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o

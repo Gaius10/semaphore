@@ -3,8 +3,9 @@
 #include <stddef.h>
 
 #include "agent.h"
-#include "fixed_toggle.h"
 #include "noop.h"
+#include "fixed_toggle.h"
+#include "linear_combination.h"
 
 ai_status_t ai_create(const config_t* config, ai_t** ai) {
     switch (config_get_ai_player(config).agent) {
@@ -12,6 +13,8 @@ ai_status_t ai_create(const config_t* config, ai_t** ai) {
             return noop_create(config, ai);
         case CONFIG_AGENT_FIXED_TOGGLE:
             return fixed_toggle_create(config, ai);
+        case CONFIG_AGENT_LINEAR_COMBINATION:
+            return linear_combination_create(config, ai);
     }
 
     return AI_STATUS_EAGENT;

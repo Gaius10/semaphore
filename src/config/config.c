@@ -48,6 +48,8 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->human_player.road_length_v = 0;
     new_config->ai_player.agent = AGENT_UNSET;
     new_config->ai_player.toggle_interval_ticks = 0;
+    new_config->ai_player.binarization_method = BINARIZATION_METHOD_THRESHOLD;
+    new_config->ai_player.threshold = 0.0;
     new_config->view.width = 0;
     new_config->view.height = 0;
     new_config->tick_ms = 0;
@@ -198,7 +200,21 @@ static config_status_t set_config_value(config_t* config, const char* key, const
     }
 
     if (strcmp(key, "toggle_interval_ticks") == 0) {
-        return parse_positive_uint(value, INT_MAX, &config->ai_player.toggle_interval_ticks);
+        return parse_positive_uint(value, UINT_MAX, &config->ai_player.toggle_interval_ticks);
+    }
+
+    if (strcmp(key, "binarization_method") == 0) {
+        if (strcmp(value, "threshold") == 0) {
+            config->ai_player.binarization_method = BINARIZATION_METHOD_THRESHOLD;
+        } else {
+            return CONFIG_STATUS_EPARSE; // Unsupported binarization method
+        }
+
+        return CONFIG_STATUS_OK;
+    }
+
+    if (strcmp(key, "threshold") == 0) {
+        return parse_probability(value, &config->ai_player.threshold);
     }
 
     /** Training config */

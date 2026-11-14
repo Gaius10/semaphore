@@ -34,17 +34,26 @@ typedef struct config_view {
 
 /** Which AI plays in AI mode. */
 typedef enum config_agent {
-    /** Never touches a light. */
-    CONFIG_AGENT_NOOP,
-    /** Swaps which light is green every `toggle_interval_ticks` ticks. */
-    CONFIG_AGENT_FIXED_TOGGLE,
+    CONFIG_AGENT_NOOP,               // Never touches a light.
+    CONFIG_AGENT_FIXED_TOGGLE,       // Swaps which light is green every `toggle_interval_ticks` ticks.
+    CONFIG_AGENT_LINEAR_COMBINATION, // Uses a linear combination of distances to decide which light is green.
 } config_agent_t;
+
+/** How the linear combination agent turns its score into a light decision. */
+typedef enum binarization_method {
+    BINARIZATION_METHOD_THRESHOLD,
+} binarization_method_t;
 
 /** AI config. The world it plays in is the same as the human's (see config_human_player_t). */
 typedef struct config_ai_player {
     config_agent_t agent;
+
     /** Ticks a light stays green before the lights swap. Only used by the fixed toggle agent; positive when set. */
     unsigned int toggle_interval_ticks;
+
+    /** Linear combination agent parameters */
+    binarization_method_t binarization_method;
+    double threshold;
 } config_ai_player_t;
 
 struct config_training {
@@ -55,14 +64,10 @@ struct config_training {
 
 typedef enum config_status {
     CONFIG_STATUS_OK,
-    /** Memory allocation failed (config_create). */
-    CONFIG_STATUS_ENOMEM,
-    /** File access error (config_create). */
-    CONFIG_STATUS_EACCESS,
-    /** File parsing error (config_create). */
-    CONFIG_STATUS_EPARSE,
-    /** A required key is absent from the file (config_create). */
-    CONFIG_STATUS_EMISSING,
+    CONFIG_STATUS_ENOMEM,   // Memory allocation failed (config_create).
+    CONFIG_STATUS_EACCESS,  // File access error (config_create).
+    CONFIG_STATUS_EPARSE,   // File parsing error (config_create).
+    CONFIG_STATUS_EMISSING, // A required key is absent from the file (config_create).
 } config_status_t;
 
 /**

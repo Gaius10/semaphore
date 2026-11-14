@@ -1,9 +1,8 @@
+#include "agent.h"
 #include "fixed_toggle.h"
 
 #include <stdbool.h>
 #include <stdlib.h>
-
-#include "agent.h"
 
 typedef struct {
     ai_t base; /* must be first */
@@ -11,6 +10,33 @@ typedef struct {
     unsigned int green_ticks;
     game_command_t pending;
 } fixed_toggle_t;
+
+static void fixed_toggle_destroy(ai_t* ai);
+static game_command_t fixed_toggle_decide(ai_t* ai, const game_t* game);
+const agent_ops_t fixed_toggle_ops = {
+    .decide = fixed_toggle_decide,
+    .destroy = fixed_toggle_destroy,
+};
+
+ai_status_t fixed_toggle_create(const config_t* config, ai_t** ai) {
+    fixed_toggle_t* self = malloc(sizeof(fixed_toggle_t));
+    if (self == NULL) {
+        return AI_STATUS_ENOMEM;
+    }
+
+    self->base.ops = &fixed_toggle_ops;
+    self->interval = config_get_ai_player(config).toggle_interval_ticks;
+    self->green_ticks = 0;
+    self->pending = GAME_COMMAND_NOOP;
+
+    *ai = &self->base;
+
+    return AI_STATUS_OK;
+}
+
+static void fixed_toggle_destroy(ai_t* ai) {
+    free(ai);
+}
 
 static game_command_t fixed_toggle_decide(ai_t* ai, const game_t* game) {
     /**
@@ -52,29 +78,4 @@ static game_command_t fixed_toggle_decide(ai_t* ai, const game_t* game) {
 
     self->pending = GAME_COMMAND_HORIZONTAL_TOGGLE;
     return GAME_COMMAND_VERTICAL_TOGGLE;
-}
-
-static void fixed_toggle_destroy(ai_t* ai) {
-    free(ai);
-}
-
-static const agent_ops_t OPS = {
-    .decide = fixed_toggle_decide,
-    .destroy = fixed_toggle_destroy,
-};
-
-ai_status_t fixed_toggle_create(const config_t* config, ai_t** ai) {
-    fixed_toggle_t* self = malloc(sizeof(fixed_toggle_t));
-    if (self == NULL) {
-        return AI_STATUS_ENOMEM;
-    }
-
-    self->base.ops = &OPS;
-    self->interval = config_get_ai_player(config).toggle_interval_ticks;
-    self->green_ticks = 0;
-    self->pending = GAME_COMMAND_NOOP;
-
-    *ai = &self->base;
-
-    return AI_STATUS_OK;
 }

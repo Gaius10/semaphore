@@ -15,12 +15,9 @@
 typedef struct Ai ai_t;
 
 typedef enum ai_status {
-    /** The operation completed successfully. */
-    AI_STATUS_OK,
-    /** Memory allocation failed (ai_create). */
-    AI_STATUS_ENOMEM,
-    /** The config is not for an AI that exists (ai_create). */
-    AI_STATUS_EAGENT,
+    AI_STATUS_OK,     // The operation completed successfully.
+    AI_STATUS_ENOMEM, // Memory allocation failed (ai_create).
+    AI_STATUS_EAGENT, // The config is not for an AI that exists (ai_create).
 } ai_status_t;
 
 /**
