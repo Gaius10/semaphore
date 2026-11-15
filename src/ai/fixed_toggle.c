@@ -48,6 +48,16 @@ static game_command_t fixed_toggle_decide(ai_t* ai, const game_t* game) {
     fixed_toggle_t* self = (fixed_toggle_t*) ai;
 
     game_command_t current = agent_current_command(game);
+
+    /** Both lights show the same color (the game starts with both green): leave only the horizontal one green. */
+    if (current.horizontal_light == current.vertical_light) {
+        self->green_ticks = 0;
+        return (game_command_t) {
+            .horizontal_light = TRAFFIC_LIGHT_GREEN,
+            .vertical_light = TRAFFIC_LIGHT_RED,
+        };
+    }
+
     if (self->green_ticks < self->interval) {
         self->green_ticks++;
         return current;

@@ -59,7 +59,7 @@ make test
 ```
 
 The tests cover `car`, `road`, `traffic_light`, `config`, `view`, `game`, `input`, `ai` (the dispatch), and the
-`noop` and `fixed_toggle` agents, and live in `tests/check_*.c`. Each module has its own
+`noop`, `fixed_toggle` and `linear_combination` agents, and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
@@ -144,8 +144,7 @@ The coefficient lists are checked once the whole file is read, so key order stil
 `coeficients_h` and `coeficients_v` must have exactly one number per cell of their road (the road
 lengths), whitespace around the numbers is fine, and an empty entry (like `1,,2` or a trailing
 comma) or a value that is not a finite number is an error. Like any other line, the list must fit in
-256 characters. `fixed_toggle` and `noop` ignore these keys. The `linear_combination` agent is
-still being written: the config accepts it, but its decision logic is not finished.
+256 characters. `fixed_toggle` and `noop` ignore these keys.
 
 ### Human mode
 
@@ -164,10 +163,11 @@ one counts:
 With `mode=ai`, an AI picks the command of every tick instead of the keyboard. The `agent` key
 says which one, and it is required in this mode:
 
-| `agent`        | Behavior                                                                                  |
-|----------------|-------------------------------------------------------------------------------------------|
-| `noop`         | Never touches a light. It only exists to exercise the architecture.                       |
-| `fixed_toggle` | Swaps which light is green every `toggle_interval_ticks` ticks, ignoring the cars.        |
+| `agent`              | Behavior                                                                           |
+|----------------------|------------------------------------------------------------------------------------|
+| `noop`               | Never touches a light. It only exists to exercise the architecture.                |
+| `fixed_toggle`       | Swaps which light is green every `toggle_interval_ticks` ticks, ignoring the cars. |
+| `linear_combination` | Scores each light from the cars queued at it and opens it above `threshold`.       |
 
 `fixed_toggle` also needs `toggle_interval_ticks` (a positive whole number): how many ticks a light
 stays green. A swap closes the green light and opens the other one in the same tick, so the lights
@@ -182,9 +182,15 @@ and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the 
 `ai_create` in `ai.c`, add its object to `OBJS`, `LIBS` and `TEST_SRC_OBJS` in the Makefile (with a
 build rule), and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
 
-`linear_combination.c` is an agent in progress that decides each light from a linear combination of
-the cars' distances to it, using the coefficients from the config. The config and `ai_create` accept
-`agent=linear_combination`, but its `decide` is not finished yet.
+`linear_combination` scores each light on its own. For a road, the score is the sum of
+`coeficient[k] * exp(-distance)` over the cars that have not passed the light yet, where `k` is the
+car's place in the queue (0 is the car closest to the light) and `distance` is the straight-line
+distance, in cells, from that car to the light. A car on the light's stop cell weighs 1, one cell
+back about 0.37, two cells back about 0.14. Cars that already passed the light are ignored. The light
+is green when the score is greater than `threshold`, and red otherwise. The two lights are decided
+independently, so both can be green at once and cause crashes. With the example config (`threshold=0.5`,
+every coefficient 0.5), one car on the stop cell scores exactly 0.5, which is not enough, so a light
+opens once about two cars are queued.
 
 ### Coordinates
 

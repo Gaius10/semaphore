@@ -127,6 +127,7 @@ TEST_OBJS := \
 	build/tests/check_ai.o \
 	build/tests/check_noop.o \
 	build/tests/check_fixed_toggle.o \
+	build/tests/check_linear_combination.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)
