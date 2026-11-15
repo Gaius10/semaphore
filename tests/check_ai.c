@@ -8,6 +8,11 @@
 
 #define NOOP_LINES "agent=noop\n"
 #define FIXED_TOGGLE_LINES "agent=fixed_toggle\ntoggle_interval_ticks=3\n"
+/* The fixture roads are 10 (horizontal) and 12 (vertical) cells long. */
+#define LINEAR_COMBINATION_LINES \
+    "agent=linear_combination\nbinarization_method=threshold\nthreshold=0.5\n" \
+    "coeficients_h=0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5\n" \
+    "coeficients_v=0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5\n"
 
 static void setup_noop(void) {
     fixture_setup(NOOP_LINES);
@@ -15,6 +20,10 @@ static void setup_noop(void) {
 
 static void setup_fixed_toggle(void) {
     fixture_setup(FIXED_TOGGLE_LINES);
+}
+
+static void setup_linear_combination(void) {
+    fixture_setup(LINEAR_COMBINATION_LINES);
 }
 
 START_TEST(test_ai_create_gives_an_ai) {
@@ -65,10 +74,10 @@ Suite* ai_suite(void) {
     Suite* s = suite_create("ai");
 
     /* The same interface tests, once per agent. */
-    void (*setups[])(void) = { setup_noop, setup_fixed_toggle };
-    const char* names[] = { "noop", "fixed_toggle" };
+    void (*setups[])(void) = { setup_noop, setup_fixed_toggle, setup_linear_combination };
+    const char* names[] = { "noop", "fixed_toggle", "linear_combination" };
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         TCase* tc = tcase_create(names[i]);
         tcase_add_checked_fixture(tc, setups[i], fixture_teardown);
 

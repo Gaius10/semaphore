@@ -13,5 +13,6 @@ Suite* traffic_light_suite(void);
 Suite* ai_suite(void);
 Suite* noop_suite(void);
 Suite* fixed_toggle_suite(void);
+Suite* linear_combination_suite(void);
 
 #endif

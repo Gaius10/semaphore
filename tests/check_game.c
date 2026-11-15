@@ -164,14 +164,14 @@ START_TEST(test_game_horizontal_cars_move_right_every_tick) {
 }
 END_TEST
 
-START_TEST(test_game_lights_start_horizontal_green_and_vertical_red) {
+START_TEST(test_game_lights_start_both_green) {
     create_game("0", "0");
 
     const traffic_light_t* h = game_get_horizontal_light(game);
     const traffic_light_t* v = game_get_vertical_light(game);
 
     ck_assert_int_eq(traffic_light_get_color(h), TRAFFIC_LIGHT_GREEN);
-    ck_assert_int_eq(traffic_light_get_color(v), TRAFFIC_LIGHT_RED);
+    ck_assert_int_eq(traffic_light_get_color(v), TRAFFIC_LIGHT_GREEN);
 }
 END_TEST
 
@@ -192,17 +192,22 @@ END_TEST
 START_TEST(test_game_command_changes_only_the_lights_it_changes) {
     create_game("0", "0");
 
+    /* Both lights start green. */
     toggle_horizontal_light();
     ck_assert_int_eq(traffic_light_get_color(game_get_horizontal_light(game)), TRAFFIC_LIGHT_RED);
-    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_RED);
+    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_GREEN);
 
     toggle_vertical_light();
     ck_assert_int_eq(traffic_light_get_color(game_get_horizontal_light(game)), TRAFFIC_LIGHT_RED);
-    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_RED);
+
+    toggle_horizontal_light();
+    ck_assert_int_eq(traffic_light_get_color(game_get_horizontal_light(game)), TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_RED);
 
     keep_lights();
-    ck_assert_int_eq(traffic_light_get_color(game_get_horizontal_light(game)), TRAFFIC_LIGHT_RED);
-    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_color(game_get_horizontal_light(game)), TRAFFIC_LIGHT_GREEN);
+    ck_assert_int_eq(traffic_light_get_color(game_get_vertical_light(game)), TRAFFIC_LIGHT_RED);
 }
 END_TEST
 
@@ -250,6 +255,7 @@ END_TEST
 START_TEST(test_game_vertical_road_starts_queued_at_its_red_light) {
     create_game("0", "2");
 
+    toggle_vertical_light(); /* closes it: both lights start green */
     run_ticks(2 * ROAD_LENGTH_V);
 
     const road_t* road = game_get_vertical_road(game);
@@ -289,9 +295,10 @@ START_TEST(test_game_red_light_only_holds_the_car_on_the_stop_cell) {
 }
 END_TEST
 
-START_TEST(test_game_no_crashes_with_the_starting_lights) {
+START_TEST(test_game_no_crashes_while_one_light_is_closed) {
     create_game("2", "2");
 
+    toggle_vertical_light(); /* closes it: both lights start green */
     run_ticks(3 * ROAD_LENGTH_V);
 
     ck_assert_uint_eq(game_get_crashes(game), 0);
@@ -306,8 +313,7 @@ START_TEST(test_game_both_lights_green_counts_crashes_and_keeps_running) {
      * t + ROAD_LENGTH_H (horizontal) or t + ROAD_LENGTH_V (vertical), so from tick
      * ROAD_LENGTH_V + 1 on both roads have a car in the crossing on every tick.
      */
-    toggle_vertical_light();
-    run_ticks(ROAD_LENGTH_V + 2);
+    run_ticks(ROAD_LENGTH_V + 3);
 
     ck_assert_uint_eq(game_get_crashes(game), 3);
     ck_assert_int_eq(game_get_state(game), GAME_STATE_RUNNING);
@@ -324,7 +330,7 @@ Suite* game_suite(void) {
     tcase_add_test(tc, test_game_horizontal_cars_spawn_at_the_vertical_road_length);
     tcase_add_test(tc, test_game_spawn_row_does_not_depend_on_the_number_of_cars);
     tcase_add_test(tc, test_game_horizontal_cars_move_right_every_tick);
-    tcase_add_test(tc, test_game_lights_start_horizontal_green_and_vertical_red);
+    tcase_add_test(tc, test_game_lights_start_both_green);
     tcase_add_test(tc, test_game_stop_cells_are_right_before_the_crossing);
     tcase_add_test(tc, test_game_command_changes_only_the_lights_it_changes);
     tcase_add_test(tc, test_game_command_sets_the_state_of_both_lights);
@@ -332,7 +338,7 @@ Suite* game_suite(void) {
     tcase_add_test(tc, test_game_vertical_road_starts_queued_at_its_red_light);
     tcase_add_test(tc, test_game_green_light_releases_the_queue);
     tcase_add_test(tc, test_game_red_light_only_holds_the_car_on_the_stop_cell);
-    tcase_add_test(tc, test_game_no_crashes_with_the_starting_lights);
+    tcase_add_test(tc, test_game_no_crashes_while_one_light_is_closed);
     tcase_add_test(tc, test_game_both_lights_green_counts_crashes_and_keeps_running);
 
     suite_add_tcase(s, tc);

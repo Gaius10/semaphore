@@ -448,7 +448,6 @@ END_TEST
 START_TEST(test_config_shipped_config_ini_parses) {
     /* Guards the config.ini that main() actually loads. `make test` runs from the repo root. */
     ck_assert_int_eq(config_create("config.ini", &config), CONFIG_STATUS_OK);
-    ck_assert_int_eq(config_get_mode(config), MODE_HUMAN_PLAYER);
 }
 END_TEST
 

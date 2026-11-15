@@ -14,6 +14,7 @@ int main(void) {
     srunner_add_suite(runner, ai_suite());
     srunner_add_suite(runner, noop_suite());
     srunner_add_suite(runner, fixed_toggle_suite());
+    srunner_add_suite(runner, linear_combination_suite());
 
     /* Set CK_FORK=no in the environment to run in-process (e.g. under valgrind/gdb). */
     srunner_run_all(runner, CK_NORMAL);
