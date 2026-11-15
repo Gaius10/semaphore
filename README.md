@@ -18,7 +18,7 @@ Also there is an evolutionary system model that learns optimal ways to control t
 │   ├── config/                Config file loading (opaque config_t + getters)
 │   ├── input/                 Keyboard input: single key presses, without waiting for Enter
 │   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop)
-│   ├── ai/                    The AI player: ai_decide(ai, game) answers with the next command
+│   ├── agents/                The AI player: ai_decide(ai, game) answers with the next command
 │   │                          ai.c picks the agent from the config; each agent has its own file and
 │   │                          struct (noop.c, fixed_toggle.c, linear_combination.c) behind the
 │   │                          interface in agent.h
@@ -177,7 +177,7 @@ start green.
 
 There is no input in this mode, so stop it with Ctrl-C.
 
-To add an agent: write `src/ai/<name>.c/.h` with its own struct (an `ai_t base` as the first member)
+To add an agent: write `src/agents/<name>.c/.h` with its own struct (an `ai_t base` as the first member)
 and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the config, add a case to
 `ai_create` in `ai.c`, add its object to `OBJS`, `LIBS` and `TEST_SRC_OBJS` in the Makefile (with a
 build rule), and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
@@ -218,7 +218,7 @@ lights start green. A game command (`game_command_t`) is the whole controllable 
 it should be from that tick on: the color of each light. It is a state, not a change, so running it
 twice gives the same result. To leave the game alone, send the colors the lights already show; to
 change one light, change only its color. The human mode does this for the `h` and `v` keys (flip that
-light), and the AIs build their commands the same way (`agent_current_command` in `src/ai/agent.h`
+light), and the AIs build their commands the same way (`agent_current_command` in `src/agents/agent.h`
 gives them the current state).
 
 Each light has a stop cell, the last cell of its road before the crossing:

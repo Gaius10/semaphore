@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include "../src/ai/ai.h"
+#include "../src/agents/ai.h"
 #include "../src/config/config.h"
 #include "../src/game/game.h"
 

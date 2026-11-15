@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-#include "../ai/ai.h"
+#include "../agents/ai.h"
 #include "../game/game.h"
 #include "../game/view.h"
 #include "sleep.h"

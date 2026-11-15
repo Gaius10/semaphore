@@ -30,11 +30,11 @@ LIBS := \
 	src/mode/human_player.h \
 	src/mode/ai_player.h \
 	src/mode/sleep.h \
-	src/ai/ai.h \
-	src/ai/agent.h \
-	src/ai/noop.h \
-	src/ai/fixed_toggle.h \
-	src/ai/linear_combination.h \
+	src/agents/ai.h \
+	src/agents/agent.h \
+	src/agents/noop.h \
+	src/agents/fixed_toggle.h \
+	src/agents/linear_combination.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h
@@ -84,17 +84,17 @@ build/human_player.o: src/mode/human_player.c $(LIBS)
 build/ai_player.o: src/mode/ai_player.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/mode/ai_player.c -o build/ai_player.o
 
-build/ai.o: src/ai/ai.c $(LIBS)
-	$(CC) $(CFLAGS) -c src/ai/ai.c -o build/ai.o
+build/ai.o: src/agents/ai.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/agents/ai.c -o build/ai.o
 
-build/noop.o: src/ai/noop.c $(LIBS)
-	$(CC) $(CFLAGS) -c src/ai/noop.c -o build/noop.o
+build/noop.o: src/agents/noop.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/agents/noop.c -o build/noop.o
 
-build/fixed_toggle.o: src/ai/fixed_toggle.c $(LIBS)
-	$(CC) $(CFLAGS) -c src/ai/fixed_toggle.c -o build/fixed_toggle.o
+build/fixed_toggle.o: src/agents/fixed_toggle.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/agents/fixed_toggle.c -o build/fixed_toggle.o
 
-build/linear_combination.o: src/ai/linear_combination.c $(LIBS)
-	$(CC) $(CFLAGS) -c src/ai/linear_combination.c -o build/linear_combination.o
+build/linear_combination.o: src/agents/linear_combination.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/agents/linear_combination.c -o build/linear_combination.o
 
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
