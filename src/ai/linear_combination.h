@@ -4,18 +4,20 @@
 #include "ai.h"
 
 /**
- * Each traffic light will be controlled by a linear combination like this:
+ * Each road gets a score from a linear combination like this:
  *
- *            R = f(a1 * x1 + a2 * x2 + ... + an * xn)
+ *            S = a1 * x1 + a2 * x2 + ... + an * xn
  *
  * Where:
  *
- *  - R is the signal to be binary (0 or 1) indicating whether the traffic light should be red or green.
- *  - a1, a2, ..., an are the coefficients representing the weights or costs associated with each variable.
- *  - x1, x2, ..., xn are the variables representing distances from each car to the traffic light (on the road).
- *  - f is a function that maps the linear combination to a binary output (0 or 1). This function could be a
- *    threshold function, where if the linear combination exceeds a certain threshold, the output is 1
- *    (green light), otherwise it is 0 (red light).
+ *  - a1, a2, ..., an are the coefficients (one per place in the queue, 1 for the car closest to the light).
+ *  - xk is the weight of the k-th car still waiting for the light: exp(-distance to the light), so 1 on the
+ *    stop cell and fading with the distance. Cars that already passed the light are ignored.
+ *
+ * The lights are decided together from D = S_horizontal - S_vertical, so they are never both green or both
+ * red after the first tick. With the threshold t from the config as a switching margin: D > t gives the green
+ * to the horizontal road, D < -t to the vertical one, and otherwise the lights stay as they are (when both show
+ * the same color, the busier road gets the green and a tie goes to the horizontal one).
  */
 ai_status_t linear_combination_create(const config_t* config, ai_t** ai);
 

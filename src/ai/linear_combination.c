@@ -64,7 +64,7 @@ static void linear_combination_destroy(ai_t* ai) {
 }
 
 static double combination(const road_t* road, const traffic_light_t* light, const double* coeficients, unsigned int length);
-static bool signal(const double combination, double threshold);
+static game_command_t choose_lights(game_command_t current, double difference, double margin);
 static game_command_t linear_combination_decide(ai_t* ai, const game_t* game) {
     linear_combination_t* self = (linear_combination_t*) ai;
 
@@ -77,13 +77,7 @@ static game_command_t linear_combination_decide(ai_t* ai, const game_t* game) {
     double h_combination = combination(h_road, h_light, self->coeficients_h, self->length_h);
     double v_combination = combination(v_road, v_light, self->coeficients_v, self->length_v);
 
-    bool h_signal = signal(h_combination, self->threshold);
-    bool v_signal = signal(v_combination, self->threshold);
-
-    return (game_command_t) {
-        .horizontal_light = h_signal ? TRAFFIC_LIGHT_GREEN : TRAFFIC_LIGHT_RED,
-        .vertical_light = v_signal ? TRAFFIC_LIGHT_GREEN : TRAFFIC_LIGHT_RED,
-    };
+    return choose_lights(agent_current_command(game), h_combination - v_combination, self->threshold);
 }
 
 static bool car_has_passed(const car_t* car, const traffic_light_t* light);
@@ -126,6 +120,37 @@ static double car_get_distance(const car_t* car, const traffic_light_t* light) {
     return hypot(dx, dy);
 }
 
-static bool signal(const double combination, double threshold) {
-    return combination > threshold;
+/**
+ * Exactly one light is green after every tick. `difference` is the horizontal score minus the
+ * vertical one, and `margin` (the threshold from the config) is how much better the other road must
+ * be before the green light switches to it:
+ *
+ *  - difference >  margin: horizontal green, vertical red
+ *  - difference < -margin: vertical green, horizontal red
+ *  - otherwise: keep the lights as they are, which also stops them flickering when the scores are close.
+ *    If the lights show the same color (e.g. both green at the start of the game), the better road
+ *    gets the green, and a tie goes to the horizontal one.
+ *
+ * A negative margin would let both conditions hold at once, so it is treated as 0.
+ */
+static game_command_t choose_lights(game_command_t current, double difference, double margin) {
+    if (margin < 0) {
+        margin = 0;
+    }
+
+    bool horizontal_green;
+    if (difference > margin) {
+        horizontal_green = true;
+    } else if (difference < -margin) {
+        horizontal_green = false;
+    } else if (current.horizontal_light != current.vertical_light) {
+        return current;
+    } else {
+        horizontal_green = difference >= 0;
+    }
+
+    return (game_command_t) {
+        .horizontal_light = horizontal_green ? TRAFFIC_LIGHT_GREEN : TRAFFIC_LIGHT_RED,
+        .vertical_light = horizontal_green ? TRAFFIC_LIGHT_RED : TRAFFIC_LIGHT_GREEN,
+    };
 }

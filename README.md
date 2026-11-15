@@ -131,7 +131,7 @@ coeficients_v=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
 | `agent`                   | when `mode=ai`                                                      | Which AI plays: `noop`, `fixed_toggle` or `linear_combination` (see [AI mode](#ai-mode)) |
 | `toggle_interval_ticks`   | when `agent=fixed_toggle`                                           | Ticks a light stays green before the lights swap (a positive whole number)               |
 | `binarization_method`     | no (defaults to `threshold`)                                        | How the linear combination becomes a light decision. Only `threshold` exists             |
-| `threshold`               | when `agent=linear_combination` and `binarization_method=threshold` | The value the combination is compared with (a number)                                    |
+| `threshold`               | when `agent=linear_combination` and `binarization_method=threshold` | How much busier the other road must be before the green switches (a number, 0 or more)   |
 | `coeficients_h`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_h` of them                                 |
 | `coeficients_v`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_v` of them                                 |
 
@@ -167,7 +167,7 @@ says which one, and it is required in this mode:
 |----------------------|------------------------------------------------------------------------------------|
 | `noop`               | Never touches a light. It only exists to exercise the architecture.                |
 | `fixed_toggle`       | Swaps which light is green every `toggle_interval_ticks` ticks, ignoring the cars. |
-| `linear_combination` | Scores each light from the cars queued at it and opens it above `threshold`.       |
+| `linear_combination` | Scores each road from its queue and gives the green to the busier one.              |
 
 `fixed_toggle` also needs `toggle_interval_ticks` (a positive whole number): how many ticks a light
 stays green. A swap closes the green light and opens the other one in the same tick, so the lights
@@ -182,15 +182,26 @@ and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the 
 `ai_create` in `ai.c`, add its object to `OBJS`, `LIBS` and `TEST_SRC_OBJS` in the Makefile (with a
 build rule), and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
 
-`linear_combination` scores each light on its own. For a road, the score is the sum of
+`linear_combination` scores each road. For a road, the score is the sum of
 `coeficient[k] * exp(-distance)` over the cars that have not passed the light yet, where `k` is the
 car's place in the queue (0 is the car closest to the light) and `distance` is the straight-line
 distance, in cells, from that car to the light. A car on the light's stop cell weighs 1, one cell
-back about 0.37, two cells back about 0.14. Cars that already passed the light are ignored. The light
-is green when the score is greater than `threshold`, and red otherwise. The two lights are decided
-independently, so both can be green at once and cause crashes. With the example config (`threshold=0.5`,
-every coefficient 0.5), one car on the stop cell scores exactly 0.5, which is not enough, so a light
-opens once about two cars are queued.
+back about 0.37, two cells back about 0.14. Cars that already passed the light are ignored.
+
+The two scores are then compared: `difference = horizontal score - vertical score`.
+
+- `difference > threshold`: horizontal green, vertical red.
+- `difference < -threshold`: vertical green, horizontal red.
+- Otherwise the lights stay as they are, so they do not flicker when the roads are about equally busy.
+  If both lights show the same color (this happens at the start of a game, since both start green),
+  the busier road gets the green, and a tie goes to the horizontal one.
+
+So after the first tick exactly one light is green, and the lights never both show green or both
+red. A negative `threshold` is treated as 0. With the example config (`threshold=0.5`, every
+coefficient 0.5), the green switches when the waiting road's score is 0.5 above the other's, which
+takes about two more queued cars on one road than on the other. Cars already in the crossing never
+stop, so a switch can still crash with cars from the old green road. The agent does not add an
+all-red step.
 
 ### Coordinates
 
