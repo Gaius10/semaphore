@@ -16,6 +16,7 @@ struct Config {
     config_human_player_t human_player;
     config_ai_player_t ai_player;
     config_view_t view;
+    config_training_t training;
     unsigned int tick_ms;
     /** How many numbers the file gave for each coefficient list (the arrays are in ai_player). */
     unsigned int coeficients_h_size;
@@ -35,9 +36,12 @@ static config_status_t set_config_value(config_t* config, const char* key, const
 static config_status_t parse_probability(const char* value, double* out);
 static config_status_t parse_positive_uint(const char* value, unsigned int max, unsigned int* out);
 static config_status_t parse_positive_int(const char* value, int* out);
+static config_status_t parse_number_in_range(const char* value, double min, bool min_exclusive, double max, double* out);
+static config_status_t parse_path(const char* value, char* out, size_t out_size);
 static config_status_t parse_double_array(const char* value, double** out, unsigned int* out_size);
 static bool is_complete(const config_t* config);
 static bool coeficients_match_roads(const config_t* config);
+static bool training_is_consistent(const config_t* config);
 static void free_config(config_t* config);
 
 config_status_t config_create(const char* path, config_t** config) {
@@ -64,6 +68,15 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->coeficients_h_size = 0;
     new_config->coeficients_v_size = 0;
 
+    /** Training: 0, NaN and the empty string mark "unset", like the sections above. */
+    new_config->training = (config_training_t) {
+        .crash_penalty = NAN,
+        .mutation_rate = NAN,
+        .mutation_sigma = NAN,
+        .coeficient_max = NAN,
+        .threshold_max = NAN,
+    };
+
     config_status_t status = parse_file(path, new_config);
     if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {
         status = CONFIG_STATUS_EMISSING;
@@ -71,6 +84,11 @@ config_status_t config_create(const char* path, config_t** config) {
 
     /** The sizes can only be checked once the whole file is read, because key order does not matter. */
     if (status == CONFIG_STATUS_OK && !coeficients_match_roads(new_config)) {
+        status = CONFIG_STATUS_EPARSE;
+    }
+
+    /** Same for the training keys that depend on each other. */
+    if (status == CONFIG_STATUS_OK && !training_is_consistent(new_config)) {
         status = CONFIG_STATUS_EPARSE;
     }
 
@@ -103,6 +121,10 @@ config_human_player_t config_get_human_player(const config_t* config) {
 
 config_ai_player_t config_get_ai_player(const config_t* config) {
     return config->ai_player;
+}
+
+config_training_t config_get_training(const config_t* config) {
+    return config->training;
 }
 
 config_view_t config_get_view(const config_t* config) {
@@ -244,8 +266,73 @@ static config_status_t set_config_value(config_t* config, const char* key, const
         return parse_probability(value, &config->ai_player.threshold);
     }
 
-    /** Training config */
-    // Parse training specific configuration options
+    /** Training config (read whatever the mode is, like the other sections) */
+    if (strcmp(key, "population_size") == 0) {
+        unsigned int parsed = 0;
+        config_status_t status = parse_positive_uint(value, UINT_MAX, &parsed);
+        if (status != CONFIG_STATUS_OK) {
+            return status;
+        }
+
+        if (parsed < 2) {
+            return CONFIG_STATUS_EPARSE; // Selection needs at least two candidates
+        }
+
+        config->training.population_size = parsed;
+        return CONFIG_STATUS_OK;
+    }
+
+    if (strcmp(key, "generations") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.generations);
+    }
+
+    if (strcmp(key, "episodes_per_candidate") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.episodes_per_candidate);
+    }
+
+    if (strcmp(key, "episode_ticks") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.episode_ticks);
+    }
+
+    if (strcmp(key, "crash_penalty") == 0) {
+        return parse_number_in_range(value, 0.0, false, INFINITY, &config->training.crash_penalty);
+    }
+
+    if (strcmp(key, "elite_count") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.elite_count);
+    }
+
+    if (strcmp(key, "tournament_size") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.tournament_size);
+    }
+
+    if (strcmp(key, "mutation_rate") == 0) {
+        return parse_number_in_range(value, 0.0, false, 1.0, &config->training.mutation_rate);
+    }
+
+    if (strcmp(key, "mutation_sigma") == 0) {
+        return parse_number_in_range(value, 0.0, true, INFINITY, &config->training.mutation_sigma);
+    }
+
+    if (strcmp(key, "coeficient_max") == 0) {
+        return parse_number_in_range(value, 0.0, true, INFINITY, &config->training.coeficient_max);
+    }
+
+    if (strcmp(key, "threshold_max") == 0) {
+        return parse_number_in_range(value, 0.0, true, INFINITY, &config->training.threshold_max);
+    }
+
+    if (strcmp(key, "seed") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.seed);
+    }
+
+    if (strcmp(key, "workers") == 0) {
+        return parse_positive_uint(value, UINT_MAX, &config->training.workers);
+    }
+
+    if (strcmp(key, "training_output_dir") == 0) {
+        return parse_path(value, config->training.output_dir, sizeof(config->training.output_dir));
+    }
 
     // Add more key-value pairs as needed for other configuration options.
     // Unknown keys are ignored.
@@ -265,6 +352,25 @@ static config_status_t parse_probability(const char* value, double* out) {
     }
 
     if (*end != '\0') {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    *out = parsed;
+    return CONFIG_STATUS_OK;
+}
+
+/**
+ * Accepts a finite number from `min` to `max` (`min` itself only when `min_exclusive` is false),
+ * optionally followed by whitespace. *out is only written on success.
+ */
+static config_status_t parse_number_in_range(const char* value, double min, bool min_exclusive, double max, double* out) {
+    double parsed = 0.0;
+    config_status_t status = parse_probability(value, &parsed);
+    if (status != CONFIG_STATUS_OK) {
+        return status;
+    }
+
+    if (!isfinite(parsed) || parsed < min || (min_exclusive && parsed == min) || parsed > max) {
         return CONFIG_STATUS_EPARSE;
     }
 
@@ -337,17 +443,45 @@ static bool is_complete(const config_t* config) {
         }
     }
 
+    bool world_is_set = !isnan(config->human_player.car_spawn_probability_h)
+        && !isnan(config->human_player.car_spawn_probability_v)
+        && config->human_player.road_length_h > 0
+        && config->human_player.road_length_v > 0;
+
     if (config->mode == MODE_HUMAN_PLAYER || config->mode == MODE_AI_PLAYER) {
-        return !isnan(config->human_player.car_spawn_probability_h)
-            && !isnan(config->human_player.car_spawn_probability_v)
-            && config->human_player.road_length_h > 0
-            && config->human_player.road_length_v > 0
+        return world_is_set
             && config->view.width > 0
             && config->view.height > 0
             && config->tick_ms > 0;
     }
 
-    return true;
+    /** Training plays the same world but has no view and no clock. */
+    const config_training_t* training = &config->training;
+    return world_is_set
+        && training->population_size > 0
+        && training->generations > 0
+        && training->episodes_per_candidate > 0
+        && training->episode_ticks > 0
+        && !isnan(training->crash_penalty)
+        && training->elite_count > 0
+        && training->tournament_size > 0
+        && !isnan(training->mutation_rate)
+        && !isnan(training->mutation_sigma)
+        && !isnan(training->coeficient_max)
+        && !isnan(training->threshold_max)
+        && training->seed > 0
+        && training->workers > 0
+        && training->output_dir[0] != '\0';
+}
+
+/** True unless training is selected and its keys do not fit together (they only make sense once the whole file is read). */
+static bool training_is_consistent(const config_t* config) {
+    if (config->mode != MODE_TRAINING) {
+        return true;
+    }
+
+    return config->training.elite_count < config->training.population_size
+        && config->training.tournament_size <= config->training.population_size;
 }
 
 /**
@@ -419,13 +553,23 @@ static void free_config(config_t* config) {
     free(config);
 }
 
+/** Copies a path without the whitespace around it. Rejects an empty path and one that does not fit in `out`. */
 static config_status_t parse_path(const char* value, char* out, size_t out_size) {
-    if (strlen(value) >= out_size) {
-        return CONFIG_STATUS_EPARSE; // Path too long
+    while (isspace((unsigned char) *value)) {
+        value++;
     }
 
-    strncpy(out, value, out_size - 1);
-    out[out_size - 1] = '\0'; // Ensure null-termination
+    size_t length = strlen(value);
+    while (length > 0 && isspace((unsigned char) value[length - 1])) {
+        length--;
+    }
+
+    if (length == 0 || length >= out_size) {
+        return CONFIG_STATUS_EPARSE;
+    }
+
+    memcpy(out, value, length);
+    out[length] = '\0';
 
     return CONFIG_STATUS_OK;
 }

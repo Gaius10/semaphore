@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "../src/config/config.h"
@@ -45,6 +46,28 @@ static const char* write_config(const char* contents) {
 #define COEF_V "coeficients_v=11,12,13,14,15,16,17,18,19,20,21,22\n"
 #define NO_MODE SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H TICK
 #define FULL_HUMAN MODE_HUMAN NO_MODE
+
+/** The training keys, one per line, so a test can leave one out. The values differ so swapped getters are caught. */
+#define MODE_TRAINING_LINE "mode=training\n"
+static const char* const TRAINING_KEYS[] = {
+    "population_size=30\n",
+    "generations=40\n",
+    "episodes_per_candidate=3\n",
+    "episode_ticks=500\n",
+    "crash_penalty=5.5\n",
+    "elite_count=2\n",
+    "tournament_size=4\n",
+    "mutation_rate=0.1\n",
+    "mutation_sigma=0.2\n",
+    "coeficient_max=2.5\n",
+    "threshold_max=4\n",
+    "seed=1234\n",
+    "workers=6\n",
+    "training_output_dir=data\n",
+};
+#define TRAINING_KEY_COUNT (sizeof(TRAINING_KEYS) / sizeof(TRAINING_KEYS[0]))
+/** Training plays the world only: no view and no tick_ms. */
+#define TRAINING_WORLD SPAWN_H SPAWN_V ROAD_H ROAD_V
 
 /** Writes `contents` to the temp file and builds `config` from it. */
 static config_status_t create_from(const char* contents) {
@@ -244,9 +267,162 @@ START_TEST(test_config_other_agents_do_not_need_coeficients) {
 }
 END_TEST
 
+/**
+ * A complete training config, with the key at `skip` left out (pass TRAINING_KEY_COUNT to leave none
+ * out) and `extra` added at the end, so a later line can replace a key.
+ */
+static const char* training_text(size_t skip, const char* extra) {
+    static char text[2048];
+    text[0] = '\0';
+    strcat(text, MODE_TRAINING_LINE TRAINING_WORLD);
+    for (size_t i = 0; i < TRAINING_KEY_COUNT; i++) {
+        if (i != skip) {
+            strcat(text, TRAINING_KEYS[i]);
+        }
+    }
+    strcat(text, extra);
+    return text;
+}
+
 START_TEST(test_config_parses_training_mode) {
-    ck_assert_int_eq(create_from("mode=training\n"), CONFIG_STATUS_OK);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "")), CONFIG_STATUS_OK);
     ck_assert_int_eq(config_get_mode(config), MODE_TRAINING);
+
+    config_training_t training = config_get_training(config);
+    ck_assert_uint_eq(training.population_size, 30);
+    ck_assert_uint_eq(training.generations, 40);
+    ck_assert_uint_eq(training.episodes_per_candidate, 3);
+    ck_assert_uint_eq(training.episode_ticks, 500);
+    ck_assert_double_eq(training.crash_penalty, 5.5);
+    ck_assert_uint_eq(training.elite_count, 2);
+    ck_assert_uint_eq(training.tournament_size, 4);
+    ck_assert_double_eq(training.mutation_rate, 0.1);
+    ck_assert_double_eq(training.mutation_sigma, 0.2);
+    ck_assert_double_eq(training.coeficient_max, 2.5);
+    ck_assert_double_eq(training.threshold_max, 4.0);
+    ck_assert_uint_eq(training.seed, 1234);
+    ck_assert_uint_eq(training.workers, 6);
+    ck_assert_str_eq(training.output_dir, "data");
+
+    /* It plays the same world as the other modes. */
+    config_human_player_t world = config_get_human_player(config);
+    ck_assert_uint_eq(world.road_length_h, 10);
+    ck_assert_uint_eq(world.road_length_v, 12);
+}
+END_TEST
+
+START_TEST(test_config_training_mode_needs_every_training_key) {
+    for (size_t skip = 0; skip < TRAINING_KEY_COUNT; skip++) {
+        config_destroy(&config);
+        ck_assert_msg(create_from(training_text(skip, "")) == CONFIG_STATUS_EMISSING, "left out: %s", TRAINING_KEYS[skip]);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
+START_TEST(test_config_training_mode_needs_the_world_keys) {
+    const char* world[] = { SPAWN_H, SPAWN_V, ROAD_H, ROAD_V };
+    for (size_t skip = 0; skip < 4; skip++) {
+        char text[2048] = MODE_TRAINING_LINE;
+        for (size_t i = 0; i < 4; i++) {
+            if (i != skip) strcat(text, world[i]);
+        }
+        for (size_t i = 0; i < TRAINING_KEY_COUNT; i++) {
+            strcat(text, TRAINING_KEYS[i]);
+        }
+
+        config_destroy(&config);
+        ck_assert_msg(create_from(text) == CONFIG_STATUS_EMISSING, "left out: %s", world[skip]);
+    }
+
+    /* Only the mode is not enough either. */
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(MODE_TRAINING_LINE), CONFIG_STATUS_EMISSING);
+}
+END_TEST
+
+START_TEST(test_config_training_mode_does_not_need_the_view_or_the_clock) {
+    /* training_text has no view_width, view_height or tick_ms. */
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "")), CONFIG_STATUS_OK);
+}
+END_TEST
+
+START_TEST(test_config_other_modes_do_not_need_the_training_keys) {
+    ck_assert_int_eq(create_from(FULL_HUMAN), CONFIG_STATUS_OK);
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP NO_MODE), CONFIG_STATUS_OK);
+}
+END_TEST
+
+START_TEST(test_config_training_invalid_values) {
+    const char* invalid[] = {
+        "population_size=1\n", "population_size=0\n", "population_size=-4\n", "population_size=ten\n",
+        "generations=0\n", "generations=2.5\n",
+        "episodes_per_candidate=0\n",
+        "episode_ticks=0\n",
+        "crash_penalty=-0.5\n", "crash_penalty=nan\n", "crash_penalty=inf\n", "crash_penalty=lots\n",
+        "elite_count=0\n",
+        "tournament_size=0\n",
+        "mutation_rate=-0.1\n", "mutation_rate=1.5\n", "mutation_rate=nan\n",
+        "mutation_sigma=0\n", "mutation_sigma=-1\n", "mutation_sigma=inf\n",
+        "coeficient_max=0\n", "coeficient_max=-2\n", "coeficient_max=inf\n",
+        "threshold_max=0\n", "threshold_max=-2\n", "threshold_max=nan\n",
+        "seed=0\n", "seed=-1\n",
+        "workers=0\n", "workers=many\n",
+        "training_output_dir=   \n",
+    };
+
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
+        config_destroy(&config);
+        ck_assert_msg(create_from(training_text(TRAINING_KEY_COUNT, invalid[i])) == CONFIG_STATUS_EPARSE, "accepted: %s", invalid[i]);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
+START_TEST(test_config_training_limits_are_inclusive_where_documented) {
+    /* population 2, the smallest one that can select; elites and tournament fill it up. */
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "population_size=2\nelite_count=1\ntournament_size=2\n")), CONFIG_STATUS_OK);
+
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "mutation_rate=0\ncrash_penalty=0\n")), CONFIG_STATUS_OK);
+    ck_assert_double_eq(config_get_training(config).mutation_rate, 0.0);
+
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "mutation_rate=1\n")), CONFIG_STATUS_OK);
+}
+END_TEST
+
+START_TEST(test_config_training_elites_and_tournament_must_fit_in_the_population) {
+    /* Population 10: all of them as elites leaves no room for children. */
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "population_size=10\nelite_count=10\n")), CONFIG_STATUS_EPARSE);
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "population_size=10\nelite_count=9\n")), CONFIG_STATUS_OK);
+
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "population_size=10\ntournament_size=11\n")), CONFIG_STATUS_EPARSE);
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "population_size=10\ntournament_size=10\n")), CONFIG_STATUS_OK);
+
+    /* Key order does not matter: the check runs once the whole file is read. */
+    config_destroy(&config);
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "elite_count=20\npopulation_size=40\n")), CONFIG_STATUS_OK);
+}
+END_TEST
+
+START_TEST(test_config_training_output_dir_is_trimmed) {
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "training_output_dir=  out/runs \r\n")), CONFIG_STATUS_OK);
+    ck_assert_str_eq(config_get_training(config).output_dir, "out/runs");
+}
+END_TEST
+
+START_TEST(test_config_training_getter_outlives_config) {
+    ck_assert_int_eq(create_from(training_text(TRAINING_KEY_COUNT, "")), CONFIG_STATUS_OK);
+    config_training_t training = config_get_training(config);
+    config_destroy(&config);
+
+    ck_assert_uint_eq(training.population_size, 30);
+    ck_assert_str_eq(training.output_dir, "data");
 }
 END_TEST
 
@@ -337,12 +513,6 @@ END_TEST
 START_TEST(test_config_invalid_tick_ms) {
     ck_assert_int_eq(create_from(MODE_HUMAN SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H "tick_ms=0\n"), CONFIG_STATUS_EPARSE);
     ck_assert_ptr_null(config);
-}
-END_TEST
-
-START_TEST(test_config_training_mode_does_not_need_human_keys) {
-    /* Only the keys of the chosen mode are required. */
-    ck_assert_int_eq(create_from("mode=training\n"), CONFIG_STATUS_OK);
 }
 END_TEST
 
@@ -474,6 +644,15 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_a_repeated_coeficients_key_replaces_the_list);
     tcase_add_test(tc, test_config_other_agents_do_not_need_coeficients);
     tcase_add_test(tc, test_config_parses_training_mode);
+    tcase_add_test(tc, test_config_training_mode_needs_every_training_key);
+    tcase_add_test(tc, test_config_training_mode_needs_the_world_keys);
+    tcase_add_test(tc, test_config_training_mode_does_not_need_the_view_or_the_clock);
+    tcase_add_test(tc, test_config_other_modes_do_not_need_the_training_keys);
+    tcase_add_test(tc, test_config_training_invalid_values);
+    tcase_add_test(tc, test_config_training_limits_are_inclusive_where_documented);
+    tcase_add_test(tc, test_config_training_elites_and_tournament_must_fit_in_the_population);
+    tcase_add_test(tc, test_config_training_output_dir_is_trimmed);
+    tcase_add_test(tc, test_config_training_getter_outlives_config);
     tcase_add_test(tc, test_config_key_order_does_not_matter);
     tcase_add_test(tc, test_config_skips_comments_and_blank_lines);
     tcase_add_test(tc, test_config_ignores_unknown_keys);
@@ -488,7 +667,6 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_human_mode_missing_view_height);
     tcase_add_test(tc, test_config_human_mode_missing_tick_ms);
     tcase_add_test(tc, test_config_invalid_tick_ms);
-    tcase_add_test(tc, test_config_training_mode_does_not_need_human_keys);
     tcase_add_test(tc, test_config_unknown_mode);
     tcase_add_test(tc, test_config_invalid_probability);
     tcase_add_test(tc, test_config_invalid_sizes);
