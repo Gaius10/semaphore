@@ -9,6 +9,8 @@ typedef struct {
     ai_t base; /* must be first */
     binarization_method_t binarization_method;
     double threshold;
+    double* coeficients_h;
+    double* coeficients_v;
 } linear_combination_t;
 
 static void linear_combination_destroy(ai_t* ai);
@@ -24,9 +26,13 @@ ai_status_t linear_combination_create(const config_t* config, ai_t** ai) {
         return AI_STATUS_ENOMEM;
     }
 
+    config_ai_player_t ai_config = config_get_ai_player(config);
+
     self->base.ops = &linear_combination_ops;
-    self->binarization_method = config_get_ai_player(config).binarization_method;
-    self->threshold = config_get_ai_player(config).threshold;
+    self->binarization_method = ai_config.binarization_method;
+    self->threshold = ai_config.threshold;
+    self->coeficients_h = ai_config.coeficients_h;
+    self->coeficients_v = ai_config.coeficients_v;
 
     *ai = (ai_t*)self;
     return AI_STATUS_OK;
@@ -37,9 +43,9 @@ static void linear_combination_destroy(ai_t* ai) {
 }
 
 static double combination(const road_t* road, const traffic_light_t* light, const double* coeficients);
-static bool signal(const double combination, const config_t* config);
+static bool signal(const double combination, double threshold);
 static game_command_t linear_combination_decide(ai_t* ai, const game_t* game) {
-    linear_combination_t* self = (linear_combination_t*)ai;
+    linear_combination_t* self = (linear_combination_t*) ai;
 
     const road_t* h_road = game_get_horizontal_road(game);
     const road_t* v_road = game_get_vertical_road(game);
@@ -47,11 +53,11 @@ static game_command_t linear_combination_decide(ai_t* ai, const game_t* game) {
     const traffic_light_t* h_light = game_get_horizontal_light(game);
     const traffic_light_t* v_light = game_get_vertical_light(game);
 
-    double h_combination = combination(h_road, h_light, config_get_ai_player(config).coeficients_h);
-    double v_combination = combination(v_road, v_light, config_get_ai_player(config).coeficients_v);
+    double h_combination = combination(h_road, h_light, self->coeficients_h);
+    double v_combination = combination(v_road, v_light, self->coeficients_v);
 
-    bool h_signal = signal(h_combination, config);
-    bool v_signal = signal(v_combination, config);
+    bool h_signal = signal(h_combination, self->threshold);
+    bool v_signal = signal(v_combination, self->threshold);
 
     return (game_command_t) {
         .horizontal_light = h_signal ? TRAFFIC_LIGHT_GREEN : TRAFFIC_LIGHT_RED,
@@ -87,7 +93,6 @@ static double car_get_distance(const car_t* car, const traffic_light_t* light) {
     return sqrt(pow(car_x - light_x, 2) + pow(car_y - light_y, 2));
 }
 
-static bool signal(const double combination, const config_t* config) {
-    double threshold = config_get_ai_player(config).threshold;
+static bool signal(const double combination, double threshold) {
     return combination > threshold;
 }

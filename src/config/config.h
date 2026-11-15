@@ -55,6 +55,7 @@ typedef struct config_ai_player {
     /** Linear combination agent parameters */
     binarization_method_t binarization_method;
     double threshold;
+
     /**
      * One coefficient per cell of each road: road_length_h and road_length_v of them (see
      * config_human_player_t). Only guaranteed to be set when the agent is linear_combination, and

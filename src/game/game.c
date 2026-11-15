@@ -9,6 +9,7 @@
 
 struct Game {
     config_human_player_t config_human_player;
+    config_ai_player_t config_ai_player;
     game_state_t state;
     road_t* horizontal_road;
     road_t* vertical_road;
@@ -32,6 +33,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
     }
 
     new_game->config_human_player = config_get_human_player(config);
+    new_game->config_ai_player = config_get_ai_player(config);
     new_game->state = GAME_STATE_RUNNING;
     new_game->crashes = 0;
     new_game->cars_passed = 0;
