@@ -105,32 +105,47 @@ view_width=21
 view_height=21
 
 [ai_player]
-; agent: noop | fixed_toggle
+; agent: noop | fixed_toggle | linear_combination
 agent=fixed_toggle
+
+; fixed_toggle agent parameters
 toggle_interval_ticks=10
+
+; linear_combination agent parameters (one coefficient per cell of each road)
+binarization_method=threshold
+threshold=0.5
+coeficients_h=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+coeficients_v=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
 ```
 
-| Key                       | Required                  | Description                                                                |
-|---------------------------|---------------------------|----------------------------------------------------------------------------|
-| `mode`                    | always                    | `human`, `ai` or `training`                                                |
-| `car_spawn_probability_h` | when `mode=human` or `ai` | Chance of a car spawning on the horizontal road each tick                  |
-| `car_spawn_probability_v` | when `mode=human` or `ai` | Chance of a car spawning on the vertical road each tick                    |
-| `road_length_h`           | when `mode=human` or `ai` | Length of the horizontal road, in cars (a positive whole number)           |
-| `road_length_v`           | when `mode=human` or `ai` | Length of the vertical road, in cars (a positive whole number)             |
-| `view_width`              | when `mode=human` or `ai` | Width of the terminal view, in cells (a positive whole number)             |
-| `view_height`             | when `mode=human` or `ai` | Height of the terminal view, in cells (a positive whole number)            |
-| `tick_ms`                 | when `mode=human` or `ai` | How long a game tick lasts, in milliseconds (a positive whole number)      |
-| `agent`                   | when `mode=ai`            | Which AI plays: `noop` or `fixed_toggle` (see [AI mode](#ai-mode))         |
-| `toggle_interval_ticks`   | when `agent=fixed_toggle` | Ticks a light stays green before the lights swap (a positive whole number) |
+| Key                       | Required                                                            | Description                                                                              |
+|---------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `mode`                    | always                                                              | `human`, `ai` or `training`                                                              |
+| `car_spawn_probability_h` | when `mode=human` or `ai`                                           | Chance of a car spawning on the horizontal road each tick                                |
+| `car_spawn_probability_v` | when `mode=human` or `ai`                                           | Chance of a car spawning on the vertical road each tick                                  |
+| `road_length_h`           | when `mode=human` or `ai`                                           | Length of the horizontal road, in cars (a positive whole number)                         |
+| `road_length_v`           | when `mode=human` or `ai`                                           | Length of the vertical road, in cars (a positive whole number)                           |
+| `view_width`              | when `mode=human` or `ai`                                           | Width of the terminal view, in cells (a positive whole number)                           |
+| `view_height`             | when `mode=human` or `ai`                                           | Height of the terminal view, in cells (a positive whole number)                          |
+| `tick_ms`                 | when `mode=human` or `ai`                                           | How long a game tick lasts, in milliseconds (a positive whole number)                    |
+| `agent`                   | when `mode=ai`                                                      | Which AI plays: `noop`, `fixed_toggle` or `linear_combination` (see [AI mode](#ai-mode)) |
+| `toggle_interval_ticks`   | when `agent=fixed_toggle`                                           | Ticks a light stays green before the lights swap (a positive whole number)               |
+| `binarization_method`     | no (defaults to `threshold`)                                        | How the linear combination becomes a light decision. Only `threshold` exists             |
+| `threshold`               | when `agent=linear_combination` and `binarization_method=threshold` | The value the combination is compared with (a number)                                    |
+| `coeficients_h`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_h` of them                                 |
+| `coeficients_v`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_v` of them                                 |
 
 There are no defaults: a missing required key is an error, and so is a value that is not valid for
 its key (an unknown `mode`, a probability that is not a number, or a length or size that is not a
 positive whole number). Unknown keys are ignored and key order does not matter. `human` and `ai` modes are
 implemented; `training` is not yet. Both use the same world, view and tick keys.
 
-`binarization_method` (only `threshold`) and `threshold` (a number) are also read, for the
-`linear_combination` agent. That agent is not finished: `agent=linear_combination` is not accepted
-yet, so these two keys have no effect for now.
+The coefficient lists are checked once the whole file is read, so key order still does not matter:
+`coeficients_h` and `coeficients_v` must have exactly one number per cell of their road (the road
+lengths), whitespace around the numbers is fine, and an empty entry (like `1,,2` or a trailing
+comma) or a value that is not a finite number is an error. Like any other line, the list must fit in
+256 characters. `fixed_toggle` and `noop` ignore these keys. The `linear_combination` agent is
+still being written: the config accepts it, but its decision logic is not finished.
 
 ### Human mode
 
@@ -167,9 +182,9 @@ and an `agent_ops_t`, add a `config_agent_t` value and its `agent=` name in the 
 `ai_create` in `ai.c`, add its object to `OBJS`, `LIBS` and `TEST_SRC_OBJS` in the Makefile (with a
 build rule), and add a `tests/check_<name>.c` (the shared setup is in `tests/ai_fixture.h`).
 
-`linear_combination.c` is a skeleton for a future agent that decides each light from a linear
-combination of the cars' distances to it. It is built and linked, and `ai_create` has a case for it,
-but no `agent=` value selects it yet and its `decide` is not implemented.
+`linear_combination.c` is an agent in progress that decides each light from a linear combination of
+the cars' distances to it, using the coefficients from the config. The config and `ai_create` accept
+`agent=linear_combination`, but its `decide` is not finished yet.
 
 ### Coordinates
 

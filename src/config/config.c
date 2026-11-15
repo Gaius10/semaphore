@@ -17,6 +17,9 @@ struct Config {
     config_ai_player_t ai_player;
     config_view_t view;
     unsigned int tick_ms;
+    /** How many numbers the file gave for each coefficient list (the arrays are in ai_player). */
+    unsigned int coeficients_h_size;
+    unsigned int coeficients_v_size;
 };
 
 /**
@@ -25,14 +28,17 @@ struct Config {
  */
 #define MODE_UNSET (MODE_TRAINING + 1)
 /** Same idea for the agent. Must stay past the last config_agent_t. */
-#define AGENT_UNSET (CONFIG_AGENT_FIXED_TOGGLE + 1)
+#define AGENT_UNSET (CONFIG_AGENT_LINEAR_COMBINATION + 1)
 
 static config_status_t parse_file(const char* path, config_t* config);
 static config_status_t set_config_value(config_t* config, const char* key, const char* value);
 static config_status_t parse_probability(const char* value, double* out);
 static config_status_t parse_positive_uint(const char* value, unsigned int max, unsigned int* out);
 static config_status_t parse_positive_int(const char* value, int* out);
+static config_status_t parse_double_array(const char* value, double** out, unsigned int* out_size);
 static bool is_complete(const config_t* config);
+static bool coeficients_match_roads(const config_t* config);
+static void free_config(config_t* config);
 
 config_status_t config_create(const char* path, config_t** config) {
     config_t* new_config = malloc(sizeof(config_t));
@@ -49,18 +55,27 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->ai_player.agent = AGENT_UNSET;
     new_config->ai_player.toggle_interval_ticks = 0;
     new_config->ai_player.binarization_method = BINARIZATION_METHOD_THRESHOLD;
-    new_config->ai_player.threshold = 0.0;
+    new_config->ai_player.threshold = NAN; // NaN marks "unset", like the probabilities
     new_config->view.width = 0;
     new_config->view.height = 0;
     new_config->tick_ms = 0;
+    new_config->ai_player.coeficients_h = NULL;
+    new_config->ai_player.coeficients_v = NULL;
+    new_config->coeficients_h_size = 0;
+    new_config->coeficients_v_size = 0;
 
     config_status_t status = parse_file(path, new_config);
     if (status == CONFIG_STATUS_OK && !is_complete(new_config)) {
         status = CONFIG_STATUS_EMISSING;
     }
 
+    /** The sizes can only be checked once the whole file is read, because key order does not matter. */
+    if (status == CONFIG_STATUS_OK && !coeficients_match_roads(new_config)) {
+        status = CONFIG_STATUS_EPARSE;
+    }
+
     if (status != CONFIG_STATUS_OK) {
-        free(new_config);
+        free_config(new_config);
         return status;
     }
 
@@ -74,7 +89,7 @@ void config_destroy(config_t** config) {
         return;
     }
 
-    free(*config);
+    free_config(*config);
     *config = NULL;
 }
 
@@ -192,6 +207,8 @@ static config_status_t set_config_value(config_t* config, const char* key, const
             config->ai_player.agent = CONFIG_AGENT_NOOP;
         } else if (strcmp(value, "fixed_toggle") == 0) {
             config->ai_player.agent = CONFIG_AGENT_FIXED_TOGGLE;
+        } else if (strcmp(value, "linear_combination") == 0) {
+            config->ai_player.agent = CONFIG_AGENT_LINEAR_COMBINATION;
         } else {
             return CONFIG_STATUS_EPARSE;
         }
@@ -199,8 +216,18 @@ static config_status_t set_config_value(config_t* config, const char* key, const
         return CONFIG_STATUS_OK;
     }
 
+    // Fixed toggle agent parameters
     if (strcmp(key, "toggle_interval_ticks") == 0) {
         return parse_positive_uint(value, UINT_MAX, &config->ai_player.toggle_interval_ticks);
+    }
+
+    // Linear combination agent parameters
+    if (strcmp(key, "coeficients_v") == 0) {
+        return parse_double_array(value, &config->ai_player.coeficients_v, &config->coeficients_v_size);
+    }
+
+    if (strcmp(key, "coeficients_h") == 0) {
+        return parse_double_array(value, &config->ai_player.coeficients_h, &config->coeficients_h_size);
     }
 
     if (strcmp(key, "binarization_method") == 0) {
@@ -296,6 +323,18 @@ static bool is_complete(const config_t* config) {
         if (config->ai_player.agent == CONFIG_AGENT_FIXED_TOGGLE && config->ai_player.toggle_interval_ticks == 0) {
             return false;
         }
+
+        if (config->ai_player.agent == CONFIG_AGENT_LINEAR_COMBINATION) {
+            if (config->ai_player.coeficients_h == NULL || config->ai_player.coeficients_v == NULL) {
+                return false;
+            }
+
+            /** The threshold only matters (and is only required) for the threshold binarization. */
+            if (config->ai_player.binarization_method == BINARIZATION_METHOD_THRESHOLD
+                    && isnan(config->ai_player.threshold)) {
+                return false;
+            }
+        }
     }
 
     if (config->mode == MODE_HUMAN_PLAYER || config->mode == MODE_AI_PLAYER) {
@@ -309,4 +348,84 @@ static bool is_complete(const config_t* config) {
     }
 
     return true;
+}
+
+/**
+ * True unless the linear combination agent is selected and its coefficient lists do not have one
+ * number per cell of their road. Only that agent cares, so the lists are ignored for the others.
+ */
+static bool coeficients_match_roads(const config_t* config) {
+    if (config->mode != MODE_AI_PLAYER || config->ai_player.agent != CONFIG_AGENT_LINEAR_COMBINATION) {
+        return true;
+    }
+
+    return config->coeficients_h_size == config->human_player.road_length_h
+        && config->coeficients_v_size == config->human_player.road_length_v;
+}
+
+/**
+ * Parses a comma-separated list of numbers, like "0.5, 0.25, 1", into a new array that replaces
+ * *out (the old one is freed). Whitespace around each number is fine. An empty list, an empty
+ * entry (e.g. a trailing comma) or a value that is not a finite number is an error, and then
+ * *out and *out_size are left untouched.
+ */
+static config_status_t parse_double_array(const char* value, double** out, unsigned int* out_size) {
+    unsigned int count = 1;
+    for (const char* c = value; *c != '\0'; c++) {
+        if (*c == ',') {
+            count++;
+        }
+    }
+
+    double* parsed = malloc(count * sizeof(double));
+    if (parsed == NULL) {
+        return CONFIG_STATUS_ENOMEM;
+    }
+
+    const char* cursor = value;
+    for (unsigned int i = 0; i < count; i++) {
+        char* end = NULL;
+        double number = strtod(cursor, &end);
+        if (end == cursor || !isfinite(number)) {
+            free(parsed);
+            return CONFIG_STATUS_EPARSE;
+        }
+
+        while (isspace((unsigned char) *end)) {
+            end++;
+        }
+
+        /** A number is followed by a comma, except the last one, which ends the value. */
+        char expected = i + 1 < count ? ',' : '\0';
+        if (*end != expected) {
+            free(parsed);
+            return CONFIG_STATUS_EPARSE;
+        }
+
+        parsed[i] = number;
+        cursor = end + 1;
+    }
+
+    free(*out);
+    *out = parsed;
+    *out_size = count;
+
+    return CONFIG_STATUS_OK;
+}
+
+static void free_config(config_t* config) {
+    free(config->ai_player.coeficients_h);
+    free(config->ai_player.coeficients_v);
+    free(config);
+}
+
+static config_status_t parse_path(const char* value, char* out, size_t out_size) {
+    if (strlen(value) >= out_size) {
+        return CONFIG_STATUS_EPARSE; // Path too long
+    }
+
+    strncpy(out, value, out_size - 1);
+    out[out_size - 1] = '\0'; // Ensure null-termination
+
+    return CONFIG_STATUS_OK;
 }

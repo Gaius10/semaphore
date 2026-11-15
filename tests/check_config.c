@@ -37,6 +37,12 @@ static const char* write_config(const char* contents) {
 #define AGENT_NOOP "agent=noop\n"
 #define AGENT_FIXED "agent=fixed_toggle\n"
 #define INTERVAL "toggle_interval_ticks=5\n"
+#define BINARIZATION "binarization_method=threshold\n"
+#define THRESHOLD "threshold=0.5\n"
+#define AGENT_LINEAR "agent=linear_combination\n"
+/* One coefficient per road cell: ROAD_H is 10 and ROAD_V is 12. The values differ so swapped lists are caught. */
+#define COEF_H "coeficients_h=1, 2.5,3 ,4,5,6,7,8,9,10\n"
+#define COEF_V "coeficients_v=11,12,13,14,15,16,17,18,19,20,21,22\n"
 #define NO_MODE SPAWN_H SPAWN_V ROAD_H ROAD_V VIEW_W VIEW_H TICK
 #define FULL_HUMAN MODE_HUMAN NO_MODE
 
@@ -131,6 +137,110 @@ END_TEST
 
 START_TEST(test_config_noop_agent_does_not_need_an_interval) {
     ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP NO_MODE), CONFIG_STATUS_OK);
+}
+END_TEST
+
+START_TEST(test_config_parses_linear_combination_agent) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD COEF_H COEF_V NO_MODE), CONFIG_STATUS_OK);
+
+    config_ai_player_t ai = config_get_ai_player(config);
+    ck_assert_int_eq(ai.agent, CONFIG_AGENT_LINEAR_COMBINATION);
+    ck_assert_int_eq(ai.binarization_method, BINARIZATION_METHOD_THRESHOLD);
+    ck_assert_double_eq_tol(ai.threshold, 0.5, 1e-9);
+
+    const double* h = ai.coeficients_h;
+    const double* v = ai.coeficients_v;
+    ck_assert_ptr_nonnull(h);
+    ck_assert_ptr_nonnull(v);
+
+    /* Spaces around the numbers are fine, and the lists are not swapped. */
+    ck_assert_double_eq_tol(h[0], 1.0, 1e-9);
+    ck_assert_double_eq_tol(h[1], 2.5, 1e-9);
+    ck_assert_double_eq_tol(h[2], 3.0, 1e-9);
+    ck_assert_double_eq_tol(h[9], 10.0, 1e-9);
+    ck_assert_double_eq_tol(v[0], 11.0, 1e-9);
+    ck_assert_double_eq_tol(v[11], 22.0, 1e-9);
+}
+END_TEST
+
+START_TEST(test_config_linear_combination_needs_its_keys) {
+    const char* const without[] = {
+        /* coeficients_h */ MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD COEF_V NO_MODE,
+        /* coeficients_v */ MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD COEF_H NO_MODE,
+        /* threshold */ MODE_AI AGENT_LINEAR BINARIZATION COEF_H COEF_V NO_MODE,
+    };
+
+    for (size_t i = 0; i < sizeof(without) / sizeof(without[0]); i++) {
+        ck_assert_msg(create_from(without[i]) == CONFIG_STATUS_EMISSING, "case %zu", i);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
+START_TEST(test_config_linear_combination_needs_one_coeficient_per_cell) {
+    const char* const wrong[] = {
+        MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD "coeficients_h=1,2,3,4,5,6,7,8,9\n" COEF_V NO_MODE,
+        MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD "coeficients_h=1,2,3,4,5,6,7,8,9,10,11\n" COEF_V NO_MODE,
+        MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD COEF_H "coeficients_v=1,2,3,4,5,6,7,8,9,10,11\n" NO_MODE,
+        /* The horizontal list given for the vertical road: the roads have different lengths. */
+        MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD COEF_H "coeficients_v=1,2,3,4,5,6,7,8,9,10\n" NO_MODE,
+    };
+
+    for (size_t i = 0; i < sizeof(wrong) / sizeof(wrong[0]); i++) {
+        ck_assert_msg(create_from(wrong[i]) == CONFIG_STATUS_EPARSE, "case %zu", i);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
+START_TEST(test_config_invalid_coeficients) {
+    const char* const bad[] = {
+        "coeficients_h=\n",       /* empty list */
+        "coeficients_h= \n",      /* blank list */
+        "coeficients_h=1,,3\n",   /* empty entry */
+        "coeficients_h=1,2,\n",   /* trailing comma */
+        "coeficients_h=,1,2\n",   /* leading comma */
+        "coeficients_h=1 2,3\n",  /* missing comma */
+        "coeficients_h=a,b\n",    /* not numbers */
+        "coeficients_h=1,2x\n",   /* junk after a number */
+        "coeficients_h=1,nan\n",  /* not finite */
+        "coeficients_h=1,inf\n",
+    };
+
+    for (size_t i = 0; i < sizeof(bad) / sizeof(bad[0]); i++) {
+        char contents[512];
+        snprintf(contents, sizeof(contents), "%s%s", FULL_HUMAN, bad[i]);
+        ck_assert_msg(create_from(contents) == CONFIG_STATUS_EPARSE, "case %zu: %s", i, bad[i]);
+        ck_assert_ptr_null(config);
+    }
+}
+END_TEST
+
+START_TEST(test_config_coeficients_key_order_does_not_matter) {
+    /* The lists come before the road lengths and the agent, so their size is checked after the whole file. */
+    ck_assert_int_eq(create_from(COEF_V COEF_H THRESHOLD BINARIZATION AGENT_LINEAR NO_MODE MODE_AI), CONFIG_STATUS_OK);
+    ck_assert_double_eq_tol(config_get_ai_player(config).coeficients_h[0], 1.0, 1e-9);
+}
+END_TEST
+
+START_TEST(test_config_a_repeated_coeficients_key_replaces_the_list) {
+    ck_assert_int_eq(create_from(
+        MODE_AI AGENT_LINEAR BINARIZATION THRESHOLD
+        "coeficients_h=7,7,7\n" COEF_H COEF_V NO_MODE), CONFIG_STATUS_OK);
+
+    ck_assert_double_eq_tol(config_get_ai_player(config).coeficients_h[0], 1.0, 1e-9);
+    ck_assert_double_eq_tol(config_get_ai_player(config).coeficients_h[9], 10.0, 1e-9);
+}
+END_TEST
+
+START_TEST(test_config_other_agents_do_not_need_coeficients) {
+    ck_assert_int_eq(create_from(MODE_AI AGENT_FIXED INTERVAL NO_MODE), CONFIG_STATUS_OK);
+    ck_assert_ptr_null(config_get_ai_player(config).coeficients_h);
+    ck_assert_ptr_null(config_get_ai_player(config).coeficients_v);
+    config_destroy(&config);
+
+    /* A list of the wrong size is ignored, since this agent does not use it. */
+    ck_assert_int_eq(create_from(MODE_AI AGENT_NOOP "coeficients_h=1,2\n" NO_MODE), CONFIG_STATUS_OK);
 }
 END_TEST
 
@@ -357,6 +467,13 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_fixed_toggle_needs_an_interval);
     tcase_add_test(tc, test_config_invalid_toggle_interval);
     tcase_add_test(tc, test_config_noop_agent_does_not_need_an_interval);
+    tcase_add_test(tc, test_config_parses_linear_combination_agent);
+    tcase_add_test(tc, test_config_linear_combination_needs_its_keys);
+    tcase_add_test(tc, test_config_linear_combination_needs_one_coeficient_per_cell);
+    tcase_add_test(tc, test_config_invalid_coeficients);
+    tcase_add_test(tc, test_config_coeficients_key_order_does_not_matter);
+    tcase_add_test(tc, test_config_a_repeated_coeficients_key_replaces_the_list);
+    tcase_add_test(tc, test_config_other_agents_do_not_need_coeficients);
     tcase_add_test(tc, test_config_parses_training_mode);
     tcase_add_test(tc, test_config_key_order_does_not_matter);
     tcase_add_test(tc, test_config_skips_comments_and_blank_lines);

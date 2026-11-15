@@ -12,7 +12,8 @@ typedef enum config_mode {
 
 /**
  * Each section of the config is a plain public struct. The config hands them out as
- * copies (see the config_get_* functions), so they stay valid after config_destroy.
+ * copies (see the config_get_* functions), so they stay valid after config_destroy. The one
+ * exception is the coefficient arrays of config_ai_player_t.
  */
 typedef struct config_human_player {
     /** World config */
@@ -54,6 +55,14 @@ typedef struct config_ai_player {
     /** Linear combination agent parameters */
     binarization_method_t binarization_method;
     double threshold;
+    /**
+     * One coefficient per cell of each road: road_length_h and road_length_v of them (see
+     * config_human_player_t). Only guaranteed to be set when the agent is linear_combination, and
+     * NULL if the file leaves them out. Unlike the rest of this struct, these arrays stay owned by
+     * the config and are only valid until config_destroy, so copy what you need.
+     */
+    double* coeficients_h;
+    double* coeficients_v;
 } config_ai_player_t;
 
 struct config_training {
@@ -76,8 +85,11 @@ typedef enum config_status {
  * `car_spawn_probability_h`, `car_spawn_probability_v`, `road_length_h`, `road_length_v`,
  * `view_width`, `view_height` and `tick_ms`. The lengths, the view size and the tick must be
  * positive whole numbers.
- * When the mode is ai, `agent` (`noop` or `fixed_toggle`) is also required, and so is
- * `toggle_interval_ticks` (a positive whole number) when the agent is `fixed_toggle`.
+ * When the mode is ai, `agent` (`noop`, `fixed_toggle` or `linear_combination`) is also required.
+ * The agent `fixed_toggle` also needs `toggle_interval_ticks` (a positive whole number). The agent
+ * `linear_combination` also needs `coeficients_h` and `coeficients_v` (comma-separated numbers,
+ * exactly one per cell of that road, so `road_length_h` and `road_length_v` of them) and, with the
+ * `threshold` binarization, `threshold`.
  * Unknown keys are ignored, and key order does not matter.
  *
  * On success, *config holds a new config that must be released with config_destroy.
