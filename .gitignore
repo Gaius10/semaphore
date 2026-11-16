@@ -2,4 +2,5 @@ semaphore
 build/*
 !build/.gitkeep
 data/*.csv
-analysis/plots/
+recordings/*
+!recordings/.gitkeep

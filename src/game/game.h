@@ -70,7 +70,8 @@ unsigned int game_get_cars_passed(const game_t* game);
  *    (red, and the car is on the stop cell) or when the car ahead of it is in the way.
  * 3. Removes the first car of each road if it went past the end of its road (twice the road length).
  * 4. Counts a crash if both roads have a car in the crossing.
- * 5. Spawns new cars, unless the road's spawn cell is taken by a car that is waiting.
+ * 5. Spawns new cars, unless the road's spawn cell is taken by a car that is waiting. Each new car
+ *    gets the next id (see car_get_id): 1 for the first car of the game, on either road, then 2, ...
  */
 game_state_t game_exec(game_t* game, game_command_t command);
 

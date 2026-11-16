@@ -621,6 +621,23 @@ START_TEST(test_config_shipped_config_ini_parses) {
 }
 END_TEST
 
+START_TEST(test_config_record_dir_is_optional) {
+    ck_assert_int_eq(create_from(FULL_HUMAN), CONFIG_STATUS_OK);
+    ck_assert_str_eq(config_get_record_dir(config), "");
+}
+END_TEST
+
+START_TEST(test_config_record_dir_is_read_without_surrounding_spaces) {
+    ck_assert_int_eq(create_from(FULL_HUMAN "record_dir=  recordings \n"), CONFIG_STATUS_OK);
+    ck_assert_str_eq(config_get_record_dir(config), "recordings");
+}
+END_TEST
+
+START_TEST(test_config_record_dir_cannot_be_empty) {
+    ck_assert_int_eq(create_from(FULL_HUMAN "record_dir=   \n"), CONFIG_STATUS_EPARSE);
+}
+END_TEST
+
 Suite* config_suite(void) {
     Suite* s = suite_create("config");
     TCase* tc = tcase_create("core");
@@ -651,6 +668,9 @@ Suite* config_suite(void) {
     tcase_add_test(tc, test_config_training_invalid_values);
     tcase_add_test(tc, test_config_training_limits_are_inclusive_where_documented);
     tcase_add_test(tc, test_config_training_elites_and_tournament_must_fit_in_the_population);
+    tcase_add_test(tc, test_config_record_dir_is_optional);
+    tcase_add_test(tc, test_config_record_dir_is_read_without_surrounding_spaces);
+    tcase_add_test(tc, test_config_record_dir_cannot_be_empty);
     tcase_add_test(tc, test_config_training_output_dir_is_trimmed);
     tcase_add_test(tc, test_config_training_getter_outlives_config);
     tcase_add_test(tc, test_config_key_order_does_not_matter);

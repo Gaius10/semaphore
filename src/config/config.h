@@ -132,6 +132,7 @@ typedef enum config_status {
  * whole numbers), `crash_penalty` (0 or more), `mutation_rate` (0 to 1), `mutation_sigma`,
  * `coeficient_max` and `threshold_max` (finite numbers above 0) and `training_output_dir` (a
  * non-empty path).
+ * `record_dir` is the one optional key: a non-empty path, read by human and ai modes.
  * Unknown keys are ignored, and key order does not matter.
  *
  * On success, *config holds a new config that must be released with config_destroy.
@@ -151,5 +152,11 @@ config_training_t config_get_training(const config_t* config);
 config_view_t config_get_view(const config_t* config);
 /** How long a game tick lasts, in milliseconds. Always positive. */
 unsigned int config_get_tick_ms(const config_t* config);
+/**
+ * Folder where human and ai modes save a recording of the game (see recorder.h), from the
+ * optional `record_dir` key. An empty string when the key is not in the file: then nothing is
+ * recorded. Owned by the config, valid until config_destroy.
+ */
+const char* config_get_record_dir(const config_t* config);
 
 #endif

@@ -23,6 +23,7 @@ Also there is an evolutionary system model that learns optimal ways to control t
 │   │                          ai.c picks the agent from the config; each agent has its own file and
 │   │                          struct (noop.c, fixed_toggle.c, linear_combination.c) behind the
 │   │                          interface in agent.h
+│   ├── recording/             recorder.c: writes a game, tick by tick, to a JSON Lines file (`record_dir`)
 │   ├── training/              What training mode is made of, with no game logic of its own:
 │   │                          genetic.c (the generic genetic algorithm), rng.c (its own random numbers),
 │   │                          candidate.c (plays one genome in headless games), evaluator.c (plays a whole
@@ -34,6 +35,8 @@ Also there is an evolutionary system model that learns optimal ways to control t
 │       └── entities/          car, road and traffic_light (opaque types, create/destroy style)
 ├── tests/                     Unit tests (Check), one check_<module>.c per module
 ├── analysis/                  plot_training.py: plots a training CSV (`make plot`); output in plots/ (git-ignored)
+│                              replay.html + make_replay.py: game replays (`make replay`); output in replays/ (git-ignored)
+├── recordings/                Game recordings from `record_dir` (git-ignored)
 ├── data/                      Training CSVs (git-ignored)
 └── build/                     Object files and the test runner (git-ignored)
 ```
@@ -330,6 +333,42 @@ threshold near 0 and to switch toward the busier road, and gains a few percent o
 The linear combination agent also never crashes (it always shows exactly one green light, and a car that has
 passed its light is out of the crossing on the next tick), so `crash_penalty` has no effect on it today. A
 fitness that also charged for waiting time or queue length would give training more to optimize.
+
+### Recording and replay
+
+Add `record_dir` to the config to record every game played in `human` or `ai` mode. It is the one
+optional key, and it can go in any section:
+
+```ini
+[game]
+record_dir=recordings
+```
+
+Each game is saved to `<record_dir>/game_YYYYMMDD_HHMMSS.jsonl` (the folder is created if it is missing,
+and a recording is never overwritten). The file is written as the game runs, one line per tick, so stop
+the game as usual (`q` in human mode, Ctrl-C in ai mode) and the recording keeps every tick up to there.
+The path is printed when the game stops.
+
+To watch a recording:
+
+```bash
+make replay                                   # latest recordings/game_*.jsonl
+make replay REC=recordings/game_20261116_201412.jsonl
+```
+
+This writes `analysis/replays/<recording name>.html`, a self-contained page (no server, no internet) that
+plays the game back: cars glide between cells, brake lights show which cars are waiting, and crashes and
+cars passing the crossing are marked. Below it, a timeline shows which light was green and the length of
+each queue over the whole game; click or drag it to jump to a tick. Keys: `Space` play/pause, arrows step
+one tick (with `Shift`, ten), `+`/`-` change the speed, `Home`/`End` jump to the start/end. Add `#t=120`
+to the URL to open it paused at tick 120. `analysis/replay.html` on its own works too: open it and drop a
+recording on it.
+
+The format is JSON Lines: a header with the world (road lengths, spawn probabilities, mode, agent, tick),
+then one line per tick (tick 0 is the game before its first tick) with both lights, the cars of each
+road as `[id, position along the road]` and the totals so far. `src/recording/recorder.h` describes it in
+full. Every car gets an id when it spawns (1, 2, 3, ... across both roads), which is how the replay
+follows each car from tick to tick.
 
 ### Coordinates
 

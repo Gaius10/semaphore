@@ -17,6 +17,8 @@ struct Game {
     traffic_light_t* vertical_light;
     unsigned int crashes;
     unsigned int cars_passed;
+    /** Id of the next car spawned, on either road. */
+    unsigned int next_car_id;
 };
 
 static void apply_command(game_t* game, game_command_t command);
@@ -24,7 +26,7 @@ static unsigned int move_cars_through(road_t* road, const traffic_light_t* light
 static void remove_car_past_road_end(road_t* road, unsigned int length_h, unsigned int length_v);
 static bool car_is_at(const car_t* car, int x, int y);
 static bool road_has_car_at(const road_t* road, int x, int y);
-static void factory_car(road_t* road, double spawn_probability, int x, int y);
+static void factory_car(game_t* game, road_t* road, double spawn_probability, int x, int y);
 
 game_status_t game_create(const config_t* config, game_t** game) {
     game_t* new_game = malloc(sizeof(game_t));
@@ -37,6 +39,7 @@ game_status_t game_create(const config_t* config, game_t** game) {
     new_game->state = GAME_STATE_RUNNING;
     new_game->crashes = 0;
     new_game->cars_passed = 0;
+    new_game->next_car_id = 1;
 
     if (road_create(&new_game->horizontal_road) != ROAD_STATUS_OK) {
         free(new_game);
@@ -145,8 +148,8 @@ game_state_t game_exec(game_t* game, game_command_t command) {
         game->crashes++;
     }
 
-    factory_car(game->horizontal_road, spawn_probability_h, 0, road_length_v);
-    factory_car(game->vertical_road, spawn_probability_v, road_length_h, 0);
+    factory_car(game, game->horizontal_road, spawn_probability_h, 0, road_length_v);
+    factory_car(game, game->vertical_road, spawn_probability_v, road_length_h, 0);
 
     return game->state;
 }
@@ -227,7 +230,7 @@ static bool road_has_car_at(const road_t* road, int x, int y) {
     return false;
 }
 
-static void factory_car(road_t* road, double spawn_probability, int x, int y) {
+static void factory_car(game_t* game, road_t* road, double spawn_probability, int x, int y) {
     if (road_has_car_at(road, x, y)) {
         return; // The queue reaches back to the spawn cell: the road is full
     }
@@ -252,5 +255,7 @@ static void factory_car(road_t* road, double spawn_probability, int x, int y) {
             car_destroy(new_car);
             return;
         }
+
+        car_set_id(new_car, game->next_car_id++);
     }
 }

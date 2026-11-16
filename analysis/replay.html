@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semaphore Replay</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #2a3342;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #58a6ff;
+    --h: #3ec5f0;
+    --v: #f5b642;
+    --green: #3ddc84;
+    --red: #ff5a5f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: radial-gradient(1200px 800px at 20% -10%, #17223a 0%, var(--bg) 55%) fixed, var(--bg);
+    color: var(--text);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+    padding: 14px 20px 10px;
+  }
+  header h1 { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: .2px; }
+  header h1 span { color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .meta b { color: var(--text); font-weight: 600; }
+  main {
+    flex: 1; min-height: 0;
+    display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 14px;
+    padding: 0 20px 12px;
+  }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  .stage {
+    position: relative; min-height: 320px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  }
+  #world { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  aside { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  }
+  .card h2 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; }
+  .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 3px 0; }
+  .stat .label { color: var(--muted); }
+  .stat .value { font: 600 18px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+  .stat .value.small { font-size: 14px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+  .lights { display: flex; gap: 10px; }
+  .light-pill {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 6px 0; border-radius: 8px; background: var(--panel-2); font-weight: 600; font-size: 13px;
+    transition: background .15s, color .15s;
+  }
+  .light-pill.g { background: rgba(61, 220, 132, .15); color: var(--green); }
+  .light-pill.r { background: rgba(255, 90, 95, .13); color: var(--red); }
+  footer {
+    padding: 10px 20px 16px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button, select {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+    height: 34px; padding: 0 12px; font: inherit; cursor: pointer;
+  }
+  button:hover, select:hover { border-color: #3b4759; }
+  button.primary { background: var(--accent); color: #08111f; border-color: transparent; font-weight: 700; min-width: 86px; }
+  .tick-label { margin-left: auto; color: var(--muted); font: 13px ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .timeline-wrap { position: relative; height: 84px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; cursor: pointer; }
+  #timeline { width: 100%; height: 100%; display: block; }
+  .legend { display: flex; gap: 14px; color: var(--muted); font-size: 12px; flex-wrap: wrap; }
+  .kbd { color: var(--muted); font-size: 12px; }
+  kbd { background: var(--panel-2); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font: 11px ui-monospace, monospace; }
+
+  #loader {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(13, 17, 23, .92); z-index: 10;
+  }
+  #loader.hidden { display: none; }
+  .drop {
+    width: min(520px, 90vw); padding: 40px 28px; text-align: center;
+    border: 2px dashed var(--border); border-radius: 16px; background: var(--panel);
+  }
+  .drop.over { border-color: var(--accent); background: #18233a; }
+  .drop h2 { margin: 0 0 6px; }
+  .drop p { color: var(--muted); margin: 6px 0 18px; }
+  .drop code { background: var(--panel-2); padding: 1px 6px; border-radius: 4px; }
+  .error { color: var(--red); margin-top: 12px; min-height: 1.4em; }
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="drop" id="drop">
+    <h2>🚦 Semaphore replay</h2>
+    <p>Drop a recording here (<code>recordings/game_*.jsonl</code>)<br>or pick one. Make one with <code>record_dir=recordings</code> in <code>config.ini</code>.</p>
+    <button class="primary" id="pick">Open recording…</button>
+    <input type="file" id="file" accept=".jsonl,.json,.txt" hidden>
+    <div class="error" id="load-error"></div>
+  </div>
+</div>
+
+<header>
+  <h1>🚦 Semaphore <span>replay</span></h1>
+  <div class="meta" id="meta"></div>
+</header>
+
+<main>
+  <div class="stage"><canvas id="world"></canvas></div>
+  <aside>
+    <div class="card">
+      <h2>Lights</h2>
+      <div class="lights">
+        <div class="light-pill" id="pill-h">Horizontal</div>
+        <div class="light-pill" id="pill-v">Vertical</div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Totals</h2>
+      <div class="stat"><span class="label">Cars passed</span><span class="value" id="s-passed">0</span></div>
+      <div class="stat"><span class="label">Crashes</span><span class="value" id="s-crashes">0</span></div>
+      <div class="stat"><span class="label">Throughput</span><span class="value small" id="s-rate">–</span></div>
+    </div>
+    <div class="card">
+      <h2 title="Cars that have not reached the crossing yet">Queues</h2>
+      <div class="stat"><span class="label"><span class="dot" style="background:var(--h)"></span>Horizontal</span><span class="value" id="s-qh">0</span></div>
+      <div class="stat"><span class="label"><span class="dot" style="background:var(--v)"></span>Vertical</span><span class="value" id="s-qv">0</span></div>
+      <div class="stat"><span class="label">Waiting now</span><span class="value small" id="s-wait">0</span></div>
+    </div>
+    <div class="card kbd">
+      <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> step · <kbd>Shift</kbd>+arrows ±10 · <kbd>+</kbd><kbd>−</kbd> speed · <kbd>Home</kbd><kbd>End</kbd>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div class="controls">
+    <button id="b-start" title="First tick (Home)">⏮</button>
+    <button id="b-back" title="Step back (←)">◀︎</button>
+    <button id="b-play" class="primary" title="Play / pause (Space)">▶ Play</button>
+    <button id="b-fwd" title="Step forward (→)">▶︎</button>
+    <button id="b-end" title="Last tick (End)">⏭</button>
+    <select id="speed" title="Playback speed (+ / −)"></select>
+    <button id="b-open" title="Open another recording">Open…</button>
+    <span class="tick-label" id="tick-label">tick 0 / 0</span>
+  </div>
+  <div class="timeline-wrap" id="timeline-wrap"><canvas id="timeline"></canvas></div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--h)"></span>horizontal green / queue</span>
+    <span><span class="dot" style="background:var(--v)"></span>vertical green / queue</span>
+    <span><span class="dot" style="background:var(--red)"></span>crash</span>
+  </div>
+</footer>
+
+<script>
+// `make replay` replaces the null below with the text of a recording, so the page plays it right away.
+const EMBEDDED_RECORDING = null; // @@RECORDING@@
+
+(() => {
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const COLORS = {
+    h: css("--h"), v: css("--v"), green: css("--green"), red: css("--red"), muted: css("--muted"),
+  };
+  const SPEEDS = [1, 2, 4, 8, 15, 30, 60, 120];
+  const DEFAULT_SPEED = 4;
+
+  // ---------- state ----------
+  let rec = null;          // { header, frames, maps, stats }
+  let time = 0;            // playback position, in ticks (float)
+  let playing = false;
+  let speed = DEFAULT_SPEED;
+  let lastFrameAt = null;
+
+  // ---------- loading ----------
+  function parseRecording(text) {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim() !== "");
+    if (lines.length < 2) throw new Error("The file has no ticks.");
+    let header;
+    try { header = JSON.parse(lines[0]); } catch { throw new Error("The first line is not JSON."); }
+    if (header.format !== "semaphore-recording") throw new Error("This is not a semaphore recording.");
+
+    const frames = [];
+    for (let i = 1; i < lines.length; i++) {
+      try { frames.push(JSON.parse(lines[i])); }
+      catch { if (i === lines.length - 1) break; throw new Error(`Line ${i + 1} is not JSON.`); } // a cut last line is fine
+    }
+    if (frames.length === 0) throw new Error("The file has no ticks.");
+
+    const H = header.road_length_h, V = header.road_length_v;
+    const maps = frames.map((f) => ({ h: new Map(f.h), v: new Map(f.v) }));
+    // Cars before their light: the horizontal light's stop cell is x = H - 1, the vertical one's y = V - 1.
+    const queueH = frames.map((f) => f.h.filter(([, p]) => p <= H - 1).length);
+    const queueV = frames.map((f) => f.v.filter(([, p]) => p <= V - 1).length);
+    const maxQueue = Math.max(1, ...queueH, ...queueV);
+    return { header, frames, maps, queueH, queueV, maxQueue };
+  }
+
+  function load(text, name) {
+    try {
+      rec = parseRecording(text);
+    } catch (e) {
+      $("load-error").textContent = e.message;
+      $("loader").classList.remove("hidden");
+      return;
+    }
+    $("load-error").textContent = "";
+    $("loader").classList.add("hidden");
+    time = 0;
+    setPlaying(true);
+    const start = /[#&]t=(\d+)/.exec(location.hash); // replay.html#t=120 opens paused at tick 120
+    if (start) { setPlaying(false); seek(Number(start[1])); }
+    renderMeta(name);
+    resize();
+  }
+
+  function renderMeta(name) {
+    const h = rec.header;
+    const pct = (p) => `${Math.round(Math.min(p, 1) * 100)}%`;
+    const items = [
+      name ? `<span><b>${escapeHtml(name)}</b></span>` : "",
+      `<span>mode <b>${h.mode}</b></span>`,
+      h.agent ? `<span>agent <b>${h.agent}</b></span>` : "",
+      `<span>roads <b>${h.road_length_h}×${h.road_length_v}</b></span>`,
+      `<span>spawn <b style="color:var(--h)">${pct(h.car_spawn_probability_h)}</b> / <b style="color:var(--v)">${pct(h.car_spawn_probability_v)}</b></span>`,
+      `<span><b>${rec.frames.length - 1}</b> ticks</span>`,
+    ];
+    $("meta").innerHTML = items.join("");
+  }
+
+  const escapeHtml = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  $("pick").onclick = () => $("file").click();
+  $("b-open").onclick = () => { setPlaying(false); $("loader").classList.remove("hidden"); };
+  $("file").onchange = (e) => readFile(e.target.files[0]);
+  $("loader").addEventListener("click", (e) => { if (e.target === $("loader") && rec) $("loader").classList.add("hidden"); });
+  const drop = $("drop");
+  ["dragenter", "dragover"].forEach((t) => document.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add("over"); $("loader").classList.remove("hidden"); }));
+  ["dragleave", "drop"].forEach((t) => document.addEventListener(t, (e) => { e.preventDefault(); if (t === "drop" || e.target === $("loader")) drop.classList.remove("over"); }));
+  document.addEventListener("drop", (e) => { if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]); });
+  function readFile(file) {
+    if (!file) return;
+    file.text().then((t) => load(t, file.name));
+  }
+
+  // ---------- controls ----------
+  const lastTick = () => (rec ? rec.frames.length - 1 : 0);
+  function setPlaying(p) {
+    playing = p && rec !== null;
+    if (playing && time >= lastTick()) time = 0;
+    $("b-play").textContent = playing ? "❚❚ Pause" : "▶ Play";
+    lastFrameAt = null;
+  }
+  function seek(t) { time = Math.max(0, Math.min(lastTick(), t)); }
+  function step(n) { setPlaying(false); seek(Math.round(time) + n); }
+
+  SPEEDS.forEach((s) => {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = `${s} ticks/s`;
+    if (s === DEFAULT_SPEED) o.selected = true;
+    $("speed").appendChild(o);
+  });
+  $("speed").onchange = (e) => { speed = Number(e.target.value); };
+  function changeSpeed(dir) {
+    const i = Math.max(0, Math.min(SPEEDS.length - 1, SPEEDS.indexOf(speed) + dir));
+    speed = SPEEDS[i]; $("speed").value = speed;
+  }
+
+  $("b-play").onclick = () => setPlaying(!playing);
+  $("b-back").onclick = () => step(-1);
+  $("b-fwd").onclick = () => step(1);
+  $("b-start").onclick = () => { setPlaying(false); seek(0); };
+  $("b-end").onclick = () => { setPlaying(false); seek(lastTick()); };
+
+  document.addEventListener("keydown", (e) => {
+    if (!rec || e.target.tagName === "SELECT") return;
+    const big = e.shiftKey ? 10 : 1;
+    switch (e.key) {
+      case " ": e.preventDefault(); setPlaying(!playing); break;
+      case "ArrowRight": e.preventDefault(); step(big); break;
+      case "ArrowLeft": e.preventDefault(); step(-big); break;
+      case "Home": setPlaying(false); seek(0); break;
+      case "End": setPlaying(false); seek(lastTick()); break;
+      case "+": case "=": changeSpeed(1); break;
+      case "-": case "_": changeSpeed(-1); break;
+    }
+  });
+
+  // timeline scrubbing
+  const tlWrap = $("timeline-wrap");
+  let scrubbing = false;
+  function scrubTo(e) {
+    const r = tlWrap.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    seek(Math.round(x * lastTick()));
+  }
+  tlWrap.addEventListener("pointerdown", (e) => { if (!rec) return; scrubbing = true; setPlaying(false); tlWrap.setPointerCapture(e.pointerId); scrubTo(e); });
+  tlWrap.addEventListener("pointermove", (e) => { if (scrubbing) scrubTo(e); });
+  tlWrap.addEventListener("pointerup", () => { scrubbing = false; });
+
+  // ---------- canvases ----------
+  const world = $("world"), wctx = world.getContext("2d");
+  const timeline = $("timeline"), tctx = timeline.getContext("2d");
+  let dpr = 1;
+
+  function fitCanvas(canvas) {
+    const r = canvas.getBoundingClientRect();
+    canvas.width = Math.max(1, Math.round(r.width * dpr));
+    canvas.height = Math.max(1, Math.round(r.height * dpr));
+  }
+  function resize() {
+    dpr = window.devicePixelRatio || 1;
+    fitCanvas(world); fitCanvas(timeline);
+    timelineCache = null;
+  }
+  window.addEventListener("resize", resize);
+
+  // ---------- world drawing ----------
+  const smooth = (a) => a * a * (3 - 2 * a);
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  /** Cell size and origin so the whole grid fits the canvas, centered. */
+  function layout() {
+    const H = rec.header.road_length_h, V = rec.header.road_length_v;
+    const cols = 2 * H + 1, rows = 2 * V + 1;
+    const pad = 18 * dpr;
+    const cell = Math.min((world.width - 2 * pad) / cols, (world.height - 2 * pad) / rows);
+    const ox = (world.width - cell * cols) / 2;
+    const oy = (world.height - cell * rows) / 2;
+    return { H, V, cols, rows, cell, ox, oy };
+  }
+
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function carColor(road, id) {
+    // Each road has its own hue band; the id shifts it a little so cars are told apart.
+    const base = road === "h" ? 195 : 38;
+    const jitter = ((id * 47) % 9 - 4) * 4;
+    const light = road === "h" ? 58 + ((id * 31) % 3) * 5 : 55 + ((id * 31) % 3) * 5;
+    return `hsl(${base + jitter} 85% ${light}%)`;
+  }
+
+  function drawScene(L) {
+    const { H, V, cols, rows, cell, ox, oy } = L;
+    const c = wctx;
+    c.clearRect(0, 0, world.width, world.height);
+
+    // ground: subtle grid of blocks
+    c.fillStyle = "#121a24";
+    roundRect(c, ox - 6 * dpr, oy - 6 * dpr, cols * cell + 12 * dpr, rows * cell + 12 * dpr, 12 * dpr);
+    c.fill();
+    c.strokeStyle = "rgba(255,255,255,0.025)";
+    c.lineWidth = 1;
+    for (let i = 0; i <= cols; i++) { c.beginPath(); c.moveTo(ox + i * cell, oy); c.lineTo(ox + i * cell, oy + rows * cell); c.stroke(); }
+    for (let j = 0; j <= rows; j++) { c.beginPath(); c.moveTo(ox, oy + j * cell); c.lineTo(ox + cols * cell, oy + j * cell); c.stroke(); }
+
+    // roads
+    const asphalt = c.createLinearGradient(0, oy + V * cell, 0, oy + (V + 1) * cell);
+    asphalt.addColorStop(0, "#2b313b"); asphalt.addColorStop(0.5, "#323946"); asphalt.addColorStop(1, "#2b313b");
+    c.fillStyle = asphalt;
+    c.fillRect(ox, oy + V * cell, cols * cell, cell);
+    const asphaltV = c.createLinearGradient(ox + H * cell, 0, ox + (H + 1) * cell, 0);
+    asphaltV.addColorStop(0, "#2b313b"); asphaltV.addColorStop(0.5, "#323946"); asphaltV.addColorStop(1, "#2b313b");
+    c.fillStyle = asphaltV;
+    c.fillRect(ox + H * cell, oy, cell, rows * cell);
+
+    // road edges
+    c.strokeStyle = "rgba(255,255,255,0.18)";
+    c.lineWidth = Math.max(1, cell * 0.03);
+    c.setLineDash([]);
+    const edgeH = (y) => { c.beginPath(); c.moveTo(ox, y); c.lineTo(ox + H * cell, y); c.moveTo(ox + (H + 1) * cell, y); c.lineTo(ox + cols * cell, y); c.stroke(); };
+    const edgeV = (x) => { c.beginPath(); c.moveTo(x, oy); c.lineTo(x, oy + V * cell); c.moveTo(x, oy + (V + 1) * cell); c.lineTo(x, oy + rows * cell); c.stroke(); };
+    edgeH(oy + V * cell); edgeH(oy + (V + 1) * cell);
+    edgeV(ox + H * cell); edgeV(ox + (H + 1) * cell);
+
+    // dashed centre lines (direction arrows feel)
+    c.strokeStyle = "rgba(255,255,255,0.10)";
+    c.setLineDash([cell * 0.25, cell * 0.35]);
+    c.beginPath(); c.moveTo(ox, oy + (V + 0.5) * cell); c.lineTo(ox + H * cell, oy + (V + 0.5) * cell);
+    c.moveTo(ox + (H + 1) * cell, oy + (V + 0.5) * cell); c.lineTo(ox + cols * cell, oy + (V + 0.5) * cell); c.stroke();
+    c.beginPath(); c.moveTo(ox + (H + 0.5) * cell, oy); c.lineTo(ox + (H + 0.5) * cell, oy + V * cell);
+    c.moveTo(ox + (H + 0.5) * cell, oy + (V + 1) * cell); c.lineTo(ox + (H + 0.5) * cell, oy + rows * cell); c.stroke();
+    c.setLineDash([]);
+
+    // crossing: zebra hatch
+    const cx = ox + H * cell, cy = oy + V * cell;
+    c.save();
+    c.beginPath(); c.rect(cx, cy, cell, cell); c.clip();
+    c.fillStyle = "#363e4c"; c.fillRect(cx, cy, cell, cell);
+    c.strokeStyle = "rgba(255, 214, 102, 0.22)";
+    c.lineWidth = cell * 0.07;
+    for (let k = -cell; k < 2 * cell; k += cell * 0.2) { c.beginPath(); c.moveTo(cx + k, cy); c.lineTo(cx + k + cell, cy + cell); c.stroke(); }
+    c.restore();
+
+    // stop lines, right before the crossing
+    c.fillStyle = "rgba(255,255,255,0.75)";
+    c.fillRect(cx - cell * 0.06, cy + cell * 0.04, cell * 0.06, cell * 0.92);
+    c.fillRect(cx + cell * 0.04, cy - cell * 0.06, cell * 0.92, cell * 0.06);
+
+    // spawn arrows
+    c.fillStyle = "rgba(255,255,255,0.14)";
+    arrow(c, ox - 2 * dpr, oy + (V + 0.5) * cell, cell * 0.22, 0);
+    arrow(c, ox + (H + 0.5) * cell, oy - 2 * dpr, cell * 0.22, Math.PI / 2);
+  }
+
+  function arrow(c, x, y, s, angle) {
+    c.save(); c.translate(x, y); c.rotate(angle);
+    c.beginPath(); c.moveTo(-s, -s * 0.8); c.lineTo(s * 0.4, 0); c.lineTo(-s, s * 0.8); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  /** A traffic light housing at cell (gx, gy), drawn on the drivers' right. */
+  function drawLight(L, gx, gy, color, roadColor, vertical) {
+    const { cell, ox, oy } = L;
+    const c = wctx;
+    const w = vertical ? cell * 0.7 : cell * 0.38, h = vertical ? cell * 0.38 : cell * 0.7;
+    const x = ox + gx * cell + (cell - w) / 2, y = oy + gy * cell + (cell - h) / 2;
+    c.fillStyle = "#0b0f15";
+    c.strokeStyle = roadColor; c.globalAlpha = 0.9; c.lineWidth = Math.max(1, cell * 0.03);
+    roundRect(c, x, y, w, h, Math.min(w, h) * 0.35); c.fill(); c.stroke();
+    c.globalAlpha = 1;
+    const r = Math.min(w, h) * 0.3;
+    const lamps = vertical
+      ? [[x + w * 0.27, y + h / 2, "r"], [x + w * 0.73, y + h / 2, "g"]]
+      : [[x + w / 2, y + h * 0.27, "r"], [x + w / 2, y + h * 0.73, "g"]];
+    for (const [lx, ly, k] of lamps) {
+      const on = k === color;
+      const col = k === "g" ? COLORS.green : COLORS.red;
+      c.save();
+      if (on) { c.shadowColor = col; c.shadowBlur = cell * 0.6; }
+      c.fillStyle = on ? col : "rgba(255,255,255,0.07)";
+      c.beginPath(); c.arc(lx, ly, r, 0, Math.PI * 2); c.fill();
+      c.restore();
+    }
+  }
+
+  function drawCar(L, road, id, pos, alpha, scale, braking) {
+    const { H, V, cell, ox, oy } = L;
+    const c = wctx;
+    const horizontal = road === "h";
+    const cxp = horizontal ? ox + (pos + 0.5) * cell : ox + (H + 0.5) * cell;
+    const cyp = horizontal ? oy + (V + 0.5) * cell : oy + (pos + 0.5) * cell;
+    const len = cell * 0.78 * scale, wid = cell * 0.5 * scale;
+
+    c.save();
+    c.globalAlpha = alpha;
+    c.translate(cxp, cyp);
+    if (!horizontal) c.rotate(Math.PI / 2);
+
+    // shadow
+    c.fillStyle = "rgba(0,0,0,0.35)";
+    roundRect(c, -len / 2 + cell * 0.03, -wid / 2 + cell * 0.05, len, wid, wid * 0.32); c.fill();
+    // body
+    const body = carColor(road, id);
+    c.fillStyle = body;
+    roundRect(c, -len / 2, -wid / 2, len, wid, wid * 0.32); c.fill();
+    // roof / glass
+    c.fillStyle = "rgba(10, 16, 26, 0.55)";
+    roundRect(c, -len * 0.12, -wid * 0.36, len * 0.36, wid * 0.72, wid * 0.18); c.fill();
+    c.fillStyle = "rgba(255,255,255,0.18)";
+    roundRect(c, -len * 0.34, -wid * 0.3, len * 0.16, wid * 0.6, wid * 0.12); c.fill();
+    // headlights
+    c.fillStyle = "rgba(255, 250, 220, 0.95)";
+    c.fillRect(len / 2 - len * 0.06, -wid * 0.38, len * 0.05, wid * 0.2);
+    c.fillRect(len / 2 - len * 0.06, wid * 0.18, len * 0.05, wid * 0.2);
+    // tail / brake lights
+    c.save();
+    if (braking) { c.shadowColor = COLORS.red; c.shadowBlur = cell * 0.35; }
+    c.fillStyle = braking ? COLORS.red : "rgba(140, 30, 40, 0.9)";
+    c.fillRect(-len / 2, -wid * 0.38, len * 0.06, wid * 0.2);
+    c.fillRect(-len / 2, wid * 0.18, len * 0.06, wid * 0.2);
+    c.restore();
+
+    c.restore();
+  }
+
+  /** Draws the cars of one road between frame i (a = 0) and frame i + 1 (a = 1). */
+  function drawRoad(L, road, i, a) {
+    const cur = rec.maps[i][road];
+    const next = rec.maps[Math.min(i + 1, lastTick())][road];
+    const prev = rec.maps[Math.max(i - 1, 0)][road];
+    const atEnd = i >= lastTick();
+    const e = smooth(a);
+    let waiting = 0;
+
+    for (const [id, p] of cur) {
+      if (atEnd) {
+        const braking = i > 0 && prev.get(id) === p;
+        if (braking) waiting++;
+        drawCar(L, road, id, p, 1, 1, braking);
+        continue;
+      }
+      if (next.has(id)) {
+        const q = next.get(id);
+        const braking = q === p;
+        if (braking) waiting++;
+        drawCar(L, road, id, lerp(p, q, e), 1, 1, braking);
+      } else {
+        // left the road: drive off the end and fade
+        drawCar(L, road, id, p + e, 1 - e, 1, false);
+      }
+    }
+    if (!atEnd) {
+      for (const [id, q] of next) {
+        if (!cur.has(id)) drawCar(L, road, id, q - 0.35 * (1 - e), e, 0.6 + 0.4 * e, false); // spawned
+      }
+    }
+    return waiting;
+  }
+
+  function drawEffects(L, i, a) {
+    const { H, V, cell, ox, oy } = L;
+    const c = wctx;
+    const f = rec.frames;
+    const cx = ox + (H + 0.5) * cell, cy = oy + (V + 0.5) * cell;
+
+    // crash: an expanding ring for the tick the crash count goes up, and a few ticks after
+    for (let back = 0; back < 4; back++) {
+      const k = i + 1 - back;
+      if (k < 1 || k > lastTick() || f[k].crashes <= f[k - 1].crashes) continue;
+      const age = back + a - 1; // 0 at the moment of the crash
+      if (age < 0) continue;
+      const t = age / 3;
+      c.save();
+      c.globalAlpha = Math.max(0, 1 - t);
+      c.strokeStyle = COLORS.red; c.lineWidth = cell * 0.12 * (1 - t) + 1;
+      c.shadowColor = COLORS.red; c.shadowBlur = cell;
+      c.beginPath(); c.arc(cx, cy, cell * (0.4 + t * 2.2), 0, Math.PI * 2); c.stroke();
+      c.fillStyle = "rgba(255,90,95,0.25)";
+      c.fillRect(ox + H * cell, oy + V * cell, cell, cell);
+      c.restore();
+      c.save(); c.globalAlpha = Math.max(0, 1 - t);
+      c.fillStyle = COLORS.red; c.font = `700 ${Math.round(cell * 0.45)}px system-ui`;
+      c.textAlign = "left"; c.fillText("CRASH", cx + cell * 0.8, cy - cell * (0.7 + t));
+      c.restore();
+    }
+
+    // cars passed: float a "+n" above the crossing
+    for (let back = 0; back < 2; back++) {
+      const k = i + 1 - back;
+      if (k < 1 || k > lastTick()) continue;
+      const gained = f[k].passed - f[k - 1].passed;
+      if (gained <= 0) continue;
+      const age = back + a - 1; // one tick long, so labels of consecutive ticks do not pile up
+      if (age < 0 || age > 1) continue;
+      c.save();
+      c.globalAlpha = 1 - age;
+      c.fillStyle = COLORS.green;
+      c.font = `700 ${Math.round(cell * 0.38)}px system-ui`;
+      c.textAlign = "left";
+      c.fillText(`+${gained}`, cx + cell * 0.8, cy + cell * (1.2 - age * 0.5));
+      c.restore();
+    }
+  }
+
+  function drawWorld() {
+    if (!rec) return { waiting: 0 };
+    const L = layout();
+    drawScene(L);
+    const i = Math.floor(time), a = time - i;
+    // Lights change at the start of a tick, so the frame being moved into shows them.
+    const lf = rec.frames[a > 0 && i < lastTick() ? i + 1 : i];
+    drawLight(L, L.H - 1, L.V + 1, lf.lh, COLORS.h, false);
+    drawLight(L, L.H - 1, L.V - 1, lf.lv, COLORS.v, true);
+    const waiting = drawRoad(L, "h", i, a) + drawRoad(L, "v", i, a);
+    drawEffects(L, i, a);
+    return { waiting, lf };
+  }
+
+  // ---------- timeline ----------
+  let timelineCache = null;
+  function buildTimeline() {
+    const W = timeline.width, Ht = timeline.height;
+    const off = document.createElement("canvas");
+    off.width = W; off.height = Ht;
+    const c = off.getContext("2d");
+    const n = rec.frames.length;
+    const band = Math.round(12 * dpr);
+    const top = band + 4 * dpr, bottom = Ht - 6 * dpr;
+    const xAt = (t) => (n <= 1 ? 0 : (t / (n - 1)) * W);
+
+    // which light is green, per tick
+    for (let t = 0; t < n; t++) {
+      const f = rec.frames[t];
+      const x0 = xAt(t - 0.5), x1 = xAt(t + 0.5);
+      c.fillStyle = f.lh === "g" && f.lv === "g" ? COLORS.red
+        : f.lh === "g" ? COLORS.h : f.lv === "g" ? COLORS.v : "#444c58";
+      c.globalAlpha = 0.85;
+      c.fillRect(x0, 0, Math.max(1, x1 - x0), band);
+    }
+    c.globalAlpha = 1;
+
+    // queue lengths
+    const yAt = (q) => bottom - (q / rec.maxQueue) * (bottom - top);
+    for (const [arr, col] of [[rec.queueH, COLORS.h], [rec.queueV, COLORS.v]]) {
+      c.beginPath();
+      c.moveTo(xAt(0), bottom);
+      arr.forEach((q, t) => c.lineTo(xAt(t), yAt(q)));
+      c.lineTo(xAt(n - 1), bottom); c.closePath();
+      c.fillStyle = col; c.globalAlpha = 0.12; c.fill();
+      c.globalAlpha = 1;
+      c.beginPath();
+      arr.forEach((q, t) => (t ? c.lineTo(xAt(t), yAt(q)) : c.moveTo(xAt(t), yAt(q))));
+      c.strokeStyle = col; c.lineWidth = 1.5 * dpr; c.stroke();
+    }
+
+    // crash marks
+    c.fillStyle = COLORS.red;
+    for (let t = 1; t < n; t++) {
+      if (rec.frames[t].crashes > rec.frames[t - 1].crashes) c.fillRect(xAt(t) - dpr, band, 2 * dpr, Ht - band);
+    }
+    timelineCache = { canvas: off, xAt };
+  }
+
+  function drawTimeline() {
+    if (!rec) return;
+    if (!timelineCache) buildTimeline();
+    const c = tctx;
+    c.clearRect(0, 0, timeline.width, timeline.height);
+    c.drawImage(timelineCache.canvas, 0, 0);
+    const x = timelineCache.xAt(time);
+    c.fillStyle = "rgba(13,17,23,0.45)";
+    c.fillRect(x, 0, timeline.width - x, timeline.height);
+    c.fillStyle = "#fff";
+    c.fillRect(x - dpr, 0, 2 * dpr, timeline.height);
+    c.beginPath(); c.arc(x, 6 * dpr, 5 * dpr, 0, Math.PI * 2); c.fill();
+  }
+
+  // ---------- side panel ----------
+  function updatePanel(waiting) {
+    const t = Math.min(lastTick(), Math.round(time));
+    const f = rec.frames[t];
+    $("tick-label").textContent = `tick ${t} / ${lastTick()}`;
+    $("s-passed").textContent = f.passed;
+    $("s-crashes").textContent = f.crashes;
+    $("s-crashes").style.color = f.crashes > 0 ? "var(--red)" : "";
+    const win = Math.min(100, t);
+    $("s-rate").textContent = win > 0 ? `${((f.passed - rec.frames[t - win].passed) / win).toFixed(2)} cars/tick` : "–";
+    $("s-qh").textContent = rec.queueH[t];
+    $("s-qv").textContent = rec.queueV[t];
+    $("s-wait").textContent = waiting;
+    for (const [k, el] of [["lh", $("pill-h")], ["lv", $("pill-v")]]) {
+      el.className = `light-pill ${f[k]}`;
+      el.innerHTML = `<span class="dot" style="background:${f[k] === "g" ? COLORS.green : COLORS.red}"></span>${k === "lh" ? "Horizontal" : "Vertical"}`;
+    }
+  }
+
+  // ---------- loop ----------
+  function frame(now) {
+    if (rec) {
+      if (playing) {
+        if (lastFrameAt !== null) time += ((now - lastFrameAt) / 1000) * speed;
+        lastFrameAt = now;
+        if (time >= lastTick()) { time = lastTick(); setPlaying(false); }
+      }
+      const { waiting } = drawWorld();
+      drawTimeline();
+      updatePanel(waiting);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  if (EMBEDDED_RECORDING !== null) load(EMBEDDED_RECORDING, document.title.replace(/^Semaphore Replay — /, ""));
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

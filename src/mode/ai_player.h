@@ -7,7 +7,9 @@
  * Runs the game in AI player mode: every tick the AI picks a command, the game runs the tick and
  * the view draws it. There is no input thread: stop it with Ctrl-C.
  *
- * Blocks until the game ends.
+ * When the config has a `record_dir`, the game is also recorded there (see recorder.h).
+ *
+ * Blocks until the game ends or Ctrl-C.
  *
  * @return 0 on success, non-zero if the game could not be set up.
  */

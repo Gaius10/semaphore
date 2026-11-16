@@ -14,6 +14,14 @@ car_status_t car_create(int x, int y, car_t** car);
 
 void car_wait(car_t* car);
 
+/**
+ * A number that tells cars apart, e.g. to follow one car from tick to tick in a recording. A new car
+ * has id 0; the game numbers the cars it spawns 1, 2, 3, ... (see game.h).
+ */
+unsigned int car_get_id(const car_t* car);
+/** Does nothing if `car` is NULL. */
+void car_set_id(car_t* car, unsigned int id);
+
 int car_get_x(const car_t* car);
 int car_get_y(const car_t* car);
 

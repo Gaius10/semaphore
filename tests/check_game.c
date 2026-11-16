@@ -164,6 +164,22 @@ START_TEST(test_game_horizontal_cars_move_right_every_tick) {
 }
 END_TEST
 
+START_TEST(test_game_numbers_cars_in_spawn_order_across_both_roads) {
+    create_game("2", "2");
+
+    keep_lights();
+    keep_lights();
+
+    /* Each tick spawns the horizontal car first, then the vertical one. */
+    const road_t* h = game_get_horizontal_road(game);
+    const road_t* v = game_get_vertical_road(game);
+    ck_assert_uint_eq(car_get_id(car_at(h, 0)), 1);
+    ck_assert_uint_eq(car_get_id(car_at(v, 0)), 2);
+    ck_assert_uint_eq(car_get_id(car_at(h, 1)), 3);
+    ck_assert_uint_eq(car_get_id(car_at(v, 1)), 4);
+}
+END_TEST
+
 START_TEST(test_game_lights_start_both_green) {
     create_game("0", "0");
 
@@ -330,6 +346,7 @@ Suite* game_suite(void) {
     tcase_add_test(tc, test_game_horizontal_cars_spawn_at_the_vertical_road_length);
     tcase_add_test(tc, test_game_spawn_row_does_not_depend_on_the_number_of_cars);
     tcase_add_test(tc, test_game_horizontal_cars_move_right_every_tick);
+    tcase_add_test(tc, test_game_numbers_cars_in_spawn_order_across_both_roads);
     tcase_add_test(tc, test_game_lights_start_both_green);
     tcase_add_test(tc, test_game_stop_cells_are_right_before_the_crossing);
     tcase_add_test(tc, test_game_command_changes_only_the_lights_it_changes);

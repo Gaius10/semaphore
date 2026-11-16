@@ -30,10 +30,23 @@ START_TEST(test_car_move_applies_delta) {
 }
 END_TEST
 
+START_TEST(test_car_id_starts_at_zero_and_can_be_set) {
+    car_t* car = NULL;
+    car_create(0, 0, &car);
+
+    ck_assert_uint_eq(car_get_id(car), 0);
+    car_set_id(car, 42);
+    ck_assert_uint_eq(car_get_id(car), 42);
+
+    car_destroy(car);
+}
+END_TEST
+
 START_TEST(test_car_null_safe_functions) {
     /* These must not crash; the test fails if the process dies. */
     car_wait(NULL);
     car_move(NULL, 1, 1);
+    car_set_id(NULL, 1);
     car_destroy(NULL);
 }
 END_TEST
@@ -44,6 +57,7 @@ Suite* car_suite(void) {
 
     tcase_add_test(tc, test_car_create_sets_initial_state);
     tcase_add_test(tc, test_car_move_applies_delta);
+    tcase_add_test(tc, test_car_id_starts_at_zero_and_can_be_set);
     tcase_add_test(tc, test_car_null_safe_functions);
 
     suite_add_tcase(s, tc);

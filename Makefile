@@ -25,6 +25,7 @@ OBJS := \
 	build/results_csv.o \
 	build/dashboard.o \
 	build/training.o \
+	build/recorder.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -51,9 +52,10 @@ LIBS := \
 	src/training/candidate.h \
 	src/training/evaluator.h \
 	src/training/results_csv.h \
-	src/training/dashboard.h
+	src/training/dashboard.h \
+	src/recording/recorder.h
 
-.PHONY: all clean run test plot
+.PHONY: all clean run test plot replay
 
 all: $(TARGET)
 
@@ -63,6 +65,10 @@ run: $(TARGET)
 # Plot a training CSV: `make plot` (latest run) or `make plot CSV=data/x.csv`
 plot:
 	python3 analysis/plot_training.py $(CSV)
+
+# HTML replay of a game recording: `make replay` (latest) or `make replay REC=recordings/x.jsonl`
+replay:
+	python3 analysis/make_replay.py $(REC)
 
 clean:
 	rm -f $(OBJS) $(TARGET) $(TEST_OBJS) $(TEST_TARGET)
@@ -135,6 +141,9 @@ build/training.o: src/mode/training.c $(LIBS)
 build/genetic.o: src/training/genetic.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/genetic.c -o build/genetic.o
 
+build/recorder.o: src/recording/recorder.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/recording/recorder.c -o build/recorder.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -161,6 +170,7 @@ TEST_SRC_OBJS := \
 	build/results_csv.o \
 	build/dashboard.o \
 	build/training.o \
+	build/recorder.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -182,7 +192,8 @@ TEST_OBJS := \
 	build/tests/check_evaluator.o \
 	build/tests/check_training.o \
 	build/tests/check_dashboard.o \
-	build/tests/check_traffic_light.o
+	build/tests/check_traffic_light.o \
+	build/tests/check_recorder.o
 
 test: $(TEST_TARGET)
 	./$(TEST_TARGET)

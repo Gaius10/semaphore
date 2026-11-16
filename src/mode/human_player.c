@@ -7,6 +7,7 @@
 #include "../game/game.h"
 #include "../game/view.h"
 #include "../input/input.h"
+#include "../recording/recorder.h"
 #include "sleep.h"
 
 /** State shared by the game thread and the input thread. */
@@ -21,7 +22,11 @@ typedef struct game_thread_args {
     shared_t* shared;
     game_t* game;
     view_t* view;
+    /** NULL when the game is not recorded. */
+    recorder_t* recorder;
     unsigned int tick_ms;
+    /** Ticks played, set by the game thread. */
+    unsigned int ticks;
 } game_thread_args_t;
 
 typedef struct input_thread_args {
@@ -62,10 +67,25 @@ int mode_run_human_player(const config_t* config) {
         return 1;
     }
 
+    recorder_t* recorder = NULL;
+    char record_path[512];
+    const char* record_dir = config_get_record_dir(config);
+    if (record_dir[0] != '\0') {
+        if (recorder_open_in(record_dir, config, record_path, sizeof(record_path), &recorder) != RECORDER_STATUS_OK) {
+            printf("Error creating a recording in '%s'.\n", record_dir);
+            input_destroy(&input);
+            view_destroy(&view);
+            game_destroy(&game);
+            return 1;
+        }
+
+        recorder_write_tick(recorder, 0, game);
+    }
+
     shared_t shared = { .pending_action = INPUT_ACTION_NONE, .quit = false };
     pthread_mutex_init(&shared.lock, NULL);
 
-    game_thread_args_t game_args = { .shared = &shared, .game = game, .view = view, .tick_ms = config_get_tick_ms(config) };
+    game_thread_args_t game_args = { .shared = &shared, .game = game, .view = view, .recorder = recorder, .tick_ms = config_get_tick_ms(config), .ticks = 0 };
     input_thread_args_t input_args = { .shared = &shared, .input = input };
 
     pthread_t game_thread;
@@ -77,6 +97,12 @@ int mode_run_human_player(const config_t* config) {
 
     pthread_mutex_destroy(&shared.lock);
     input_destroy(&input);
+
+    if (recorder != NULL) {
+        recorder_close(&recorder);
+        printf("Recorded %u ticks to %s\n", game_args.ticks, record_path);
+    }
+
     view_destroy(&view);
     game_destroy(&game);
     return 0;
@@ -94,6 +120,10 @@ static void* game_thread_main(void* arg) {
         game_command_t command = command_for(action, args->game);
 
         game_state_t state = game_exec(args->game, command);
+        args->ticks++;
+        if (args->recorder != NULL) {
+            recorder_write_tick(args->recorder, args->ticks, args->game);
+        }
         view_render(
             args->view,
             game_get_horizontal_road(args->game),

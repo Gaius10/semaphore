@@ -18,6 +18,8 @@ struct Config {
     config_view_t view;
     config_training_t training;
     unsigned int tick_ms;
+    /** Optional: empty when the file leaves it out. */
+    char record_dir[256];
     /** How many numbers the file gave for each coefficient list (the arrays are in ai_player). */
     unsigned int coeficients_h_size;
     unsigned int coeficients_v_size;
@@ -63,6 +65,7 @@ config_status_t config_create(const char* path, config_t** config) {
     new_config->view.width = 0;
     new_config->view.height = 0;
     new_config->tick_ms = 0;
+    new_config->record_dir[0] = '\0';
     new_config->ai_player.coeficients_h = NULL;
     new_config->ai_player.coeficients_v = NULL;
     new_config->coeficients_h_size = 0;
@@ -133,6 +136,10 @@ config_view_t config_get_view(const config_t* config) {
 
 unsigned int config_get_tick_ms(const config_t* config) {
     return config->tick_ms;
+}
+
+const char* config_get_record_dir(const config_t* config) {
+    return config->record_dir;
 }
 
 static config_status_t parse_file(const char* path, config_t* config) {
@@ -328,6 +335,10 @@ static config_status_t set_config_value(config_t* config, const char* key, const
 
     if (strcmp(key, "workers") == 0) {
         return parse_positive_uint(value, UINT_MAX, &config->training.workers);
+    }
+
+    if (strcmp(key, "record_dir") == 0) {
+        return parse_path(value, config->record_dir, sizeof(config->record_dir));
     }
 
     if (strcmp(key, "training_output_dir") == 0) {
