@@ -134,6 +134,9 @@ build/genetic.o: src/training/genetic.c $(LIBS)
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
+CHECK_LIBDIR := $(shell pkg-config --variable=libdir check)
+CHECK_RPATH  := -Wl,-rpath,$(CHECK_LIBDIR)
+CHECK_LIBS   += $(if $(CHECK_LIBDIR),$(CHECK_RPATH))
 
 TEST_TARGET := build/test_runner
 
@@ -181,7 +184,7 @@ test: $(TEST_TARGET)
 	./$(TEST_TARGET)
 
 $(TEST_TARGET): $(TEST_OBJS) $(TEST_SRC_OBJS)
-	$(CC) $(LDFLAGS) $(TEST_OBJS) $(TEST_SRC_OBJS) -o $@ $(CHECK_LIBS)
+	$(CC) $(LDFLAGS) $(TEST_OBJS) $(TEST_SRC_OBJS) -o $@ $(CHECK_LIBS) $(LDLIBS)
 
 build/tests/%.o: tests/%.c tests/suites.h tests/ai_fixture.h $(LIBS)
 	@mkdir -p build/tests
