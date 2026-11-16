@@ -53,12 +53,16 @@ LIBS := \
 	src/training/results_csv.h \
 	src/training/dashboard.h
 
-.PHONY: all clean run test
+.PHONY: all clean run test plot
 
 all: $(TARGET)
 
 run: $(TARGET)
 	./$(TARGET)
+
+# Plot a training CSV: `make plot` (latest run) or `make plot CSV=data/x.csv`
+plot:
+	python3 analysis/plot_training.py $(CSV)
 
 clean:
 	rm -f $(OBJS) $(TARGET) $(TEST_OBJS) $(TEST_TARGET)

@@ -33,6 +33,8 @@ Also there is an evolutionary system model that learns optimal ways to control t
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
 │       └── entities/          car, road and traffic_light (opaque types, create/destroy style)
 ├── tests/                     Unit tests (Check), one check_<module>.c per module
+├── analysis/                  plot_training.py: plots a training CSV (`make plot`); output in plots/ (git-ignored)
+├── data/                      Training CSVs (git-ignored)
 └── build/                     Object files and the test runner (git-ignored)
 ```
 
@@ -310,16 +312,16 @@ generation is done. Each row has the champion of that generation in full:
 | `v0` ... `v<road_length_v - 1>`              | The champion's coefficients for the vertical road                                |
 
 Numbers have 17 significant digits, so they read back exactly: playing a row's genome again in the same
-generation (same `seed` and `generation`) gives the same fitness. To plot the evolution:
+generation (same `seed` and `generation`) gives the same fitness. To plot a run (needs Python 3 with
+pandas and matplotlib):
 
-```python
-import pandas as pd
-import matplotlib.pyplot as plt
-
-runs = pd.read_csv("data/training_20261116_011205.csv")
-runs.plot(x="generation", y=["champion_fitness", "mean_fitness", "worst_fitness"])
-plt.show()
+```bash
+make plot                                  # latest data/training_*.csv
+make plot CSV=data/training_20261116_011205.csv
 ```
+
+This runs `analysis/plot_training.py`, which saves `analysis/plots/<run name>.png`: the champion, mean
+and worst fitness per generation. Run the script directly with `--show` to also open a window.
 
 **What to expect.** With busy roads (`car_spawn_probability` 0.5 on both) the crossing is saturated: only one
 road can pass cars at a time, so the cars passed in a game can't be much more than its number of ticks, and
