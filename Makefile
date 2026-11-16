@@ -39,7 +39,9 @@ LIBS := \
 	src/game/entities/car.h \
 	src/game/entities/traffic_light.h \
 	src/training/rng.h \
-	src/training/genetic.h
+	src/training/genetic.h \
+	src/training/candidate.h \
+	src/training/evaluator.h
 
 .PHONY: all clean run test
 
@@ -101,6 +103,12 @@ build/linear_combination.o: src/agents/linear_combination.c $(LIBS)
 build/rng.o: src/training/rng.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/rng.c -o build/rng.o
 
+build/candidate.o: src/training/candidate.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/candidate.c -o build/candidate.o
+
+build/evaluator.o: src/training/evaluator.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/evaluator.c -o build/evaluator.o
+
 build/genetic.o: src/training/genetic.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/genetic.c -o build/genetic.o
 
@@ -122,6 +130,8 @@ TEST_SRC_OBJS := \
 	build/linear_combination.o \
 	build/rng.o \
 	build/genetic.o \
+	build/candidate.o \
+	build/evaluator.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -140,6 +150,7 @@ TEST_OBJS := \
 	build/tests/check_linear_combination.o \
 	build/tests/check_rng.o \
 	build/tests/check_genetic.o \
+	build/tests/check_evaluator.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)

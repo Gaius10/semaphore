@@ -1,3 +1,4 @@
+#include "../src/agents/linear_combination.h"
 #include "ai_fixture.h"
 #include "suites.h"
 
@@ -104,6 +105,89 @@ START_TEST(test_linear_combination_runs_with_cars_queued_on_the_stop_cells) {
 }
 END_TEST
 
+/** The numbers of LINES, as arrays, so the tests can build the same agent without a config. */
+static void same_numbers_as_lines(double* h, double* v) {
+    for (int i = 0; i < 10; i++) {
+        h[i] = 0.5;
+    }
+    for (int i = 0; i < 12; i++) {
+        v[i] = 0.5;
+    }
+}
+
+START_TEST(test_linear_combination_create_from_decides_like_create) {
+    double h[10], v[12];
+    same_numbers_as_lines(h, v);
+    ai_t* from_numbers = NULL;
+    ck_assert_int_eq(linear_combination_create_from(0.5, h, 10, v, 12, &from_numbers), AI_STATUS_OK);
+
+    for (int tick = 0; tick < 400; tick++) {
+        game_command_t expected = ai_decide(ai, game);
+        game_command_t actual = ai_decide(from_numbers, game);
+        ck_assert_int_eq(actual.horizontal_light, expected.horizontal_light);
+        ck_assert_int_eq(actual.vertical_light, expected.vertical_light);
+        game_exec(game, expected);
+    }
+
+    ai_destroy(&from_numbers);
+}
+END_TEST
+
+START_TEST(test_linear_combination_create_from_copies_the_arrays) {
+    double h[10], v[12];
+    same_numbers_as_lines(h, v);
+    ai_t* from_numbers = NULL;
+    ck_assert_int_eq(linear_combination_create_from(0.5, h, 10, v, 12, &from_numbers), AI_STATUS_OK);
+
+    /* Wipe the caller's arrays: the agent must keep its own numbers. */
+    for (int i = 0; i < 10; i++) {
+        h[i] = 1000;
+    }
+    for (int i = 0; i < 12; i++) {
+        v[i] = -1000;
+    }
+
+    for (int tick = 0; tick < 300; tick++) {
+        game_command_t expected = ai_decide(ai, game);
+        game_command_t actual = ai_decide(from_numbers, game);
+        ck_assert_int_eq(actual.horizontal_light, expected.horizontal_light);
+        ck_assert_int_eq(actual.vertical_light, expected.vertical_light);
+        game_exec(game, expected);
+    }
+
+    ai_destroy(&from_numbers);
+}
+END_TEST
+
+START_TEST(test_linear_combination_create_from_accepts_lists_shorter_than_the_road) {
+    /* Only the first 2 cars of each road count: the others must not read past the arrays. */
+    double h[2] = { 1, 1 };
+    double v[1] = { 1 };
+    ai_t* short_ai = NULL;
+    ck_assert_int_eq(linear_combination_create_from(0.1, h, 2, v, 1, &short_ai), AI_STATUS_OK);
+
+    for (int tick = 0; tick < 300; tick++) {
+        game_exec(game, ai_decide(short_ai, game));
+    }
+
+    ai_destroy(&short_ai);
+}
+END_TEST
+
+START_TEST(test_linear_combination_create_from_rejects_missing_arrays_and_zero_lengths) {
+    double h[10], v[12];
+    same_numbers_as_lines(h, v);
+    ai_t* untouched = (ai_t*)h; /* any address: it must come back unchanged */
+    ai_t* result = untouched;
+
+    ck_assert_int_eq(linear_combination_create_from(0.5, NULL, 10, v, 12, &result), AI_STATUS_EAGENT);
+    ck_assert_int_eq(linear_combination_create_from(0.5, h, 10, NULL, 12, &result), AI_STATUS_EAGENT);
+    ck_assert_int_eq(linear_combination_create_from(0.5, h, 0, v, 12, &result), AI_STATUS_EAGENT);
+    ck_assert_int_eq(linear_combination_create_from(0.5, h, 10, v, 0, &result), AI_STATUS_EAGENT);
+    ck_assert_ptr_eq(result, untouched);
+}
+END_TEST
+
 Suite* linear_combination_suite(void) {
     Suite* s = suite_create("linear_combination");
     TCase* tc = tcase_create("core");
@@ -116,6 +200,10 @@ Suite* linear_combination_suite(void) {
     tcase_add_test(tc, test_linear_combination_works_after_config_is_destroyed);
     tcase_add_test(tc, test_linear_combination_decide_does_not_change_the_game);
     tcase_add_test(tc, test_linear_combination_runs_with_cars_queued_on_the_stop_cells);
+    tcase_add_test(tc, test_linear_combination_create_from_decides_like_create);
+    tcase_add_test(tc, test_linear_combination_create_from_copies_the_arrays);
+    tcase_add_test(tc, test_linear_combination_create_from_accepts_lists_shorter_than_the_road);
+    tcase_add_test(tc, test_linear_combination_create_from_rejects_missing_arrays_and_zero_lengths);
 
     suite_add_tcase(s, tc);
     return s;

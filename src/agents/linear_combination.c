@@ -27,26 +27,48 @@ ai_status_t linear_combination_create(const config_t* config, ai_t** ai) {
     config_ai_player_t ai_config = config_get_ai_player(config);
     config_human_player_t world = config_get_human_player(config);
 
+    return linear_combination_create_from(
+        ai_config.threshold,
+        ai_config.coeficients_h,
+        world.road_length_h,
+        ai_config.coeficients_v,
+        world.road_length_v,
+        ai
+    );
+}
+
+ai_status_t linear_combination_create_from(
+    double threshold,
+    const double* coeficients_h,
+    unsigned int length_h,
+    const double* coeficients_v,
+    unsigned int length_v,
+    ai_t** ai
+) {
+    if (coeficients_h == NULL || coeficients_v == NULL || length_h == 0 || length_v == 0) {
+        return AI_STATUS_EAGENT;
+    }
+
     linear_combination_t* self = calloc(1, sizeof(linear_combination_t));
     if (!self) {
         return AI_STATUS_ENOMEM;
     }
 
-    /* The config owns its coefficient arrays and frees them in config_destroy, so keep copies. */
-    self->coeficients_h = malloc(world.road_length_h * sizeof(double));
-    self->coeficients_v = malloc(world.road_length_v * sizeof(double));
+    /* The caller keeps its arrays (the config frees its own in config_destroy), so keep copies. */
+    self->coeficients_h = malloc(length_h * sizeof(double));
+    self->coeficients_v = malloc(length_v * sizeof(double));
     if (!self->coeficients_h || !self->coeficients_v) {
         linear_combination_destroy((ai_t*)self);
         return AI_STATUS_ENOMEM;
     }
-    memcpy(self->coeficients_h, ai_config.coeficients_h, world.road_length_h * sizeof(double));
-    memcpy(self->coeficients_v, ai_config.coeficients_v, world.road_length_v * sizeof(double));
+    memcpy(self->coeficients_h, coeficients_h, length_h * sizeof(double));
+    memcpy(self->coeficients_v, coeficients_v, length_v * sizeof(double));
 
-    self->length_h = world.road_length_h;
-    self->length_v = world.road_length_v;
+    self->length_h = length_h;
+    self->length_v = length_v;
     self->base.ops = &linear_combination_ops;
-    self->binarization_method = ai_config.binarization_method;
-    self->threshold = ai_config.threshold;
+    self->binarization_method = BINARIZATION_METHOD_THRESHOLD;
+    self->threshold = threshold;
 
     *ai = (ai_t*)self;
     return AI_STATUS_OK;

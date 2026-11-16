@@ -21,4 +21,23 @@
  */
 ai_status_t linear_combination_create(const config_t* config, ai_t** ai);
 
+/**
+ * The same agent, built straight from numbers instead of a config: `threshold` is the switching margin
+ * t, and the coefficients are one per place in the queue of each road (`length_h` and `length_v` of
+ * them; usually the road lengths, but any positive length works: cars beyond the last place count 0).
+ * The training builds thousands of agents this way, with no file or parsing in between.
+ *
+ * The agent copies both arrays, so the caller can free or reuse them right away. Returns
+ * AI_STATUS_EAGENT if an array is NULL or a length is 0, and AI_STATUS_ENOMEM if the memory runs out;
+ * *ai is left untouched on failure. On success it must be released with ai_destroy.
+ */
+ai_status_t linear_combination_create_from(
+    double threshold,
+    const double* coeficients_h,
+    unsigned int length_h,
+    const double* coeficients_v,
+    unsigned int length_v,
+    ai_t** ai
+);
+
 #endif
