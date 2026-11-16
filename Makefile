@@ -18,6 +18,12 @@ OBJS := \
 	build/noop.o \
 	build/fixed_toggle.o \
 	build/linear_combination.o \
+	build/rng.o \
+	build/genetic.o \
+	build/candidate.o \
+	build/evaluator.o \
+	build/results_csv.o \
+	build/training.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -29,6 +35,7 @@ LIBS := \
 	src/input/input.h \
 	src/mode/human_player.h \
 	src/mode/ai_player.h \
+	src/mode/training.h \
 	src/mode/sleep.h \
 	src/agents/ai.h \
 	src/agents/agent.h \
@@ -41,7 +48,8 @@ LIBS := \
 	src/training/rng.h \
 	src/training/genetic.h \
 	src/training/candidate.h \
-	src/training/evaluator.h
+	src/training/evaluator.h \
+	src/training/results_csv.h
 
 .PHONY: all clean run test
 
@@ -109,6 +117,12 @@ build/candidate.o: src/training/candidate.c $(LIBS)
 build/evaluator.o: src/training/evaluator.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/evaluator.c -o build/evaluator.o
 
+build/results_csv.o: src/training/results_csv.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/results_csv.c -o build/results_csv.o
+
+build/training.o: src/mode/training.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/mode/training.c -o build/training.o
+
 build/genetic.o: src/training/genetic.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/genetic.c -o build/genetic.o
 
@@ -132,6 +146,8 @@ TEST_SRC_OBJS := \
 	build/genetic.o \
 	build/candidate.o \
 	build/evaluator.o \
+	build/results_csv.o \
+	build/training.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -151,6 +167,7 @@ TEST_OBJS := \
 	build/tests/check_rng.o \
 	build/tests/check_genetic.o \
 	build/tests/check_evaluator.o \
+	build/tests/check_training.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)

@@ -5,6 +5,7 @@
 #include "config/config.h"
 #include "mode/ai_player.h"
 #include "mode/human_player.h"
+#include "mode/training.h"
 
 static int run(const config_t* config);
 
@@ -43,14 +44,20 @@ int main(int argc, char** argv) {
 }
 
 static int run(const config_t* config) {
-    config_mode_t mode = config_get_mode(config);
-    if (mode != MODE_HUMAN_PLAYER && mode != MODE_AI_PLAYER) {
-        printf("Not implemented yet.\n");
-        printf("Only human player and AI player modes are currently supported.\n");
-        return 1;
+    int _run = 1;
+
+    switch (config_get_mode(config)) {
+        case MODE_HUMAN_PLAYER:
+            _run = mode_run_human_player(config);
+            break;
+        case MODE_AI_PLAYER:
+            _run = mode_run_ai_player(config);
+            break;
+        case MODE_TRAINING:
+            _run = mode_run_training(config);
+            break;
     }
 
-    int _run = mode == MODE_HUMAN_PLAYER ? mode_run_human_player(config) : mode_run_ai_player(config);
     if (_run != 0) {
         printf("Error running game.\n");
         return 1;
