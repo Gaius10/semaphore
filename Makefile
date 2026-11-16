@@ -37,7 +37,9 @@ LIBS := \
 	src/agents/linear_combination.h \
 	src/game/entities/road.h \
 	src/game/entities/car.h \
-	src/game/entities/traffic_light.h
+	src/game/entities/traffic_light.h \
+	src/training/rng.h \
+	src/training/genetic.h
 
 .PHONY: all clean run test
 
@@ -96,6 +98,12 @@ build/fixed_toggle.o: src/agents/fixed_toggle.c $(LIBS)
 build/linear_combination.o: src/agents/linear_combination.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/agents/linear_combination.c -o build/linear_combination.o
 
+build/rng.o: src/training/rng.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/rng.c -o build/rng.o
+
+build/genetic.o: src/training/genetic.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/genetic.c -o build/genetic.o
+
 # Unit tests (Check). Run with `make test` from the repo root.
 CHECK_CFLAGS := $(shell pkg-config --cflags check)
 CHECK_LIBS   := $(shell pkg-config --libs check)
@@ -112,6 +120,8 @@ TEST_SRC_OBJS := \
 	build/noop.o \
 	build/fixed_toggle.o \
 	build/linear_combination.o \
+	build/rng.o \
+	build/genetic.o \
 	build/road.o \
 	build/car.o \
 	build/traffic_light.o
@@ -128,6 +138,8 @@ TEST_OBJS := \
 	build/tests/check_noop.o \
 	build/tests/check_fixed_toggle.o \
 	build/tests/check_linear_combination.o \
+	build/tests/check_rng.o \
+	build/tests/check_genetic.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)
