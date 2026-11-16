@@ -17,11 +17,17 @@ Also there is an evolutionary system model that learns optimal ways to control t
 │   ├── main.c                 Entry point: loads the config and starts the mode it asks for
 │   ├── config/                Config file loading (opaque config_t + getters)
 │   ├── input/                 Keyboard input: single key presses, without waiting for Enter
-│   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop)
+│   ├── mode/                  One file per mode: human_player (game + input threads), ai_player (single loop),
+│   │                          training (genetic algorithm, see [Training mode](#training-mode))
 │   ├── agents/                The AI player: ai_decide(ai, game) answers with the next command
 │   │                          ai.c picks the agent from the config; each agent has its own file and
 │   │                          struct (noop.c, fixed_toggle.c, linear_combination.c) behind the
 │   │                          interface in agent.h
+│   ├── training/              What training mode is made of, with no game logic of its own:
+│   │                          genetic.c (the generic genetic algorithm), rng.c (its own random numbers),
+│   │                          candidate.c (plays one genome in headless games), evaluator.c (plays a whole
+│   │                          population in parallel worker processes), results_csv.c (the CSV file) and
+│   │                          dashboard.c (the live terminal panel)
 │   └── game/
 │       ├── game.c / game.h    Game state and the per-tick update
 │       ├── view.c / view.h    Terminal view: draws the two roads as a character grid
@@ -58,8 +64,9 @@ Run the unit tests (from the repository root):
 make test
 ```
 
-The tests cover `car`, `road`, `traffic_light`, `config`, `view`, `game`, `input`, `ai` (the dispatch), and the
-`noop`, `fixed_toggle` and `linear_combination` agents, and live in `tests/check_*.c`. Each module has its own
+The tests cover `car`, `road`, `traffic_light`, `config`, `view`, `game`, `input`, `ai` (the dispatch), the
+`noop`, `fixed_toggle` and `linear_combination` agents, and the training code (`rng`, `genetic`, `evaluator`
+with the candidate wrapper, `training` with the results file, and `dashboard`), and live in `tests/check_*.c`. Each module has its own
 suite, registered in `tests/check_main.c`. To add one, write `tests/check_<module>.c` with a
 `<module>_suite()` function, declare it in `tests/suites.h`, add it to `check_main.c`, and add the
 object to `TEST_OBJS` (and the module's object to `TEST_SRC_OBJS`) in the Makefile.
@@ -116,15 +123,31 @@ binarization_method=threshold
 threshold=0.5
 coeficients_h=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
 coeficients_v=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
+
+[training]
+population_size=30
+generations=40
+episodes_per_candidate=3
+episode_ticks=500
+crash_penalty=5
+elite_count=2
+tournament_size=3
+mutation_rate=0.1
+mutation_sigma=0.1
+coeficient_max=2
+threshold_max=4
+seed=1
+workers=4
+training_output_dir=data
 ```
 
 | Key                       | Required                                                            | Description                                                                              |
 |---------------------------|---------------------------------------------------------------------|------------------------------------------------------------------------------------------|
 | `mode`                    | always                                                              | `human`, `ai` or `training`                                                              |
-| `car_spawn_probability_h` | when `mode=human` or `ai`                                           | Chance of a car spawning on the horizontal road each tick                                |
-| `car_spawn_probability_v` | when `mode=human` or `ai`                                           | Chance of a car spawning on the vertical road each tick                                  |
-| `road_length_h`           | when `mode=human` or `ai`                                           | Length of the horizontal road, in cars (a positive whole number)                         |
-| `road_length_v`           | when `mode=human` or `ai`                                           | Length of the vertical road, in cars (a positive whole number)                           |
+| `car_spawn_probability_h` | when `mode=human`, `ai` or `training`                                           | Chance of a car spawning on the horizontal road each tick                                |
+| `car_spawn_probability_v` | when `mode=human`, `ai` or `training`                                           | Chance of a car spawning on the vertical road each tick                                  |
+| `road_length_h`           | when `mode=human`, `ai` or `training`                                           | Length of the horizontal road, in cars (a positive whole number)                         |
+| `road_length_v`           | when `mode=human`, `ai` or `training`                                           | Length of the vertical road, in cars (a positive whole number)                           |
 | `view_width`              | when `mode=human` or `ai`                                           | Width of the terminal view, in cells (a positive whole number)                           |
 | `view_height`             | when `mode=human` or `ai`                                           | Height of the terminal view, in cells (a positive whole number)                          |
 | `tick_ms`                 | when `mode=human` or `ai`                                           | How long a game tick lasts, in milliseconds (a positive whole number)                    |
@@ -134,11 +157,26 @@ coeficients_v=0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5
 | `threshold`               | when `agent=linear_combination` and `binarization_method=threshold` | How much busier the other road must be before the green switches (a number, 0 or more)   |
 | `coeficients_h`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_h` of them                                 |
 | `coeficients_v`           | when `agent=linear_combination`                                     | Comma-separated numbers, exactly `road_length_v` of them                                 |
+| `population_size`         | when `mode=training`                                                | Candidates per generation (a whole number, at least 2)                                   |
+| `generations`             | when `mode=training`                                                | How many generations the run lasts (a positive whole number)                             |
+| `episodes_per_candidate`  | when `mode=training`                                                | Games played to score one candidate (a positive whole number)                            |
+| `episode_ticks`           | when `mode=training`                                                | Ticks in each of those games (a positive whole number)                                   |
+| `crash_penalty`           | when `mode=training`                                                | Fitness of a game = cars passed - `crash_penalty` * crashes (a number, 0 or more)        |
+| `elite_count`             | when `mode=training`                                                | Best candidates copied unchanged into the next generation (positive, less than `population_size`) |
+| `tournament_size`         | when `mode=training`                                                | Candidates drawn at random for each parent selection (positive, at most `population_size`) |
+| `mutation_rate`           | when `mode=training`                                                | Chance that each number of a child mutates (0 to 1)                                      |
+| `mutation_sigma`          | when `mode=training`                                                | Size of a mutation as a fraction of the range of the number (a number above 0)           |
+| `coeficient_max`          | when `mode=training`                                                | Coefficients are searched in `[0, coeficient_max]` (a number above 0)                    |
+| `threshold_max`           | when `mode=training`                                                | The threshold is searched in `[0, threshold_max]` (a number above 0)                     |
+| `seed`                    | when `mode=training`                                                | Seed of the run: the same seed gives the same run (a positive whole number)              |
+| `workers`                 | when `mode=training`                                                | Worker processes that play candidates at the same time (a positive whole number)         |
+| `training_output_dir`     | when `mode=training`                                                | Folder where the results file goes, created if missing (a non-empty path)                |
 
 There are no defaults: a missing required key is an error, and so is a value that is not valid for
 its key (an unknown `mode`, a probability that is not a number, or a length or size that is not a
-positive whole number). Unknown keys are ignored and key order does not matter. `human` and `ai` modes are
-implemented; `training` is not yet. Both use the same world, view and tick keys.
+positive whole number). Unknown keys are ignored and key order does not matter. All three modes are
+implemented. `human` and `ai` use the same world, view and tick keys. `training` plays the same world but
+has no view, so it does not need the view keys or `tick_ms`; the training keys are ignored by the other modes.
 
 The coefficient lists are checked once the whole file is read, so key order still does not matter:
 `coeficients_h` and `coeficients_v` must have exactly one number per cell of their road (the road
@@ -202,6 +240,94 @@ coefficient 0.5), the green switches when the waiting road's score is 0.5 above 
 takes about two more queued cars on one road than on the other. Cars already in the crossing never
 stop, so a switch can still crash with cars from the old green road. The agent does not add an
 all-red step.
+
+### Training mode
+
+With `mode=training`, a genetic algorithm looks for the `threshold` and the coefficients of the
+`linear_combination` agent that pass the most cars. Nothing is drawn by the game: candidates are scored by
+playing real games, in memory, with the same agent that `mode=ai` uses, so a trained genome pasted into
+`config.ini` behaves the way it did in training (up to the 10 digits that are printed).
+
+**The search.** A candidate (a genome) is the list `[threshold, coeficients_h..., coeficients_v...]`, 1 plus
+`road_length_h` plus `road_length_v` numbers (21 with the example roads). The first generation is random,
+the threshold in `[0, threshold_max]` and each coefficient in `[0, coeficient_max]`. To get the next one:
+
+1. The `elite_count` best candidates are copied unchanged.
+2. Every other slot gets a child. Two parents are picked by tournament selection (the best of
+   `tournament_size` candidates drawn at random), each number comes from either parent with equal
+   chance, and then each number mutates with probability `mutation_rate` by a random step of
+   `mutation_sigma` times its range. Numbers are kept inside their ranges.
+
+**The fitness** of a candidate is the average over `episodes_per_candidate` games of `episode_ticks` ticks of
+`cars passed - crash_penalty * crashes`. Before each game the random numbers of the game are reset
+with a seed made from `seed`, the generation and the game number. So every candidate of a generation plays
+exactly the same traffic (which makes them comparable), and the traffic changes from one generation to the
+next (so the search can't memorize one sequence of cars). The same `seed` always gives the same run, whatever
+`workers` is.
+
+**Parallelism.** The candidates of a generation are played by `workers` processes at the same time. They are
+processes and not threads on purpose: the game draws its cars with `rand()`, whose state is shared by all the
+threads of a process, so threads would each get a different slice of the numbers and the traffic would
+change from run to run. A worker process has its own copy of it. The results come back through shared
+memory, and a worker that fails or dies stops the run (the other workers are killed and nothing is left
+running).
+
+**What you see.** On a terminal at least 70 columns wide and tall enough, training shows a panel that is
+redrawn in place: the run summary, the progress of the whole run and of every worker, the fitness of the last
+generation with its change from the one before, sparklines of the champion and the mean fitness over the
+generations, and the genome of the champion drawn as bars (one block per coefficient, as high as its value
+compared with `coeficient_max`). When the output is redirected to a file, or the terminal is too small, it
+prints one plain line per generation instead.
+
+Ctrl-C stops the run cleanly: the generation in progress finishes, its row is written to the results file, and
+the best genome found so far is printed. Press it twice to quit at once.
+
+At the end, it prints the best genome seen as lines to paste into `[ai_player]` (with `mode=ai` and
+`agent=linear_combination`):
+
+```ini
+threshold=0.08666263244
+coeficients_h=0.7977561936, 1.448589795, 2, ...
+coeficients_v=1.182966079, 0.8207992701, 0.9044922325, ...
+```
+
+The fitness of different generations is measured on different traffic, so the "best seen" can be a candidate
+that was lucky once. To compare a genome fairly, run it against several seeds, for instance in a copy of the
+config with a different `seed` and more `episodes_per_candidate`.
+
+**The results file.** Every run writes a new file, `<training_output_dir>/training_<YYYYmmdd_HHMMSS>.csv`
+(an existing file is never overwritten), with a header and one row per generation, flushed as soon as the
+generation is done. Each row has the champion of that generation in full:
+
+| Column                                       | Meaning                                                                          |
+|----------------------------------------------|----------------------------------------------------------------------------------|
+| `generation`                                 | Generation number, starting at 0 (the number the traffic seeds are made from)    |
+| `champion_fitness`                           | Fitness of the best candidate of the generation                                  |
+| `mean_fitness`, `worst_fitness`              | Mean and lowest fitness of the generation                                        |
+| `champion_cars_passed`, `champion_crashes`   | Averages per game of the two numbers the champion's fitness is made of           |
+| `threshold`                                  | The champion's threshold                                                         |
+| `h0` ... `h<road_length_h - 1>`              | The champion's coefficients for the horizontal road                              |
+| `v0` ... `v<road_length_v - 1>`              | The champion's coefficients for the vertical road                                |
+
+Numbers have 17 significant digits, so they read back exactly: playing a row's genome again in the same
+generation (same `seed` and `generation`) gives the same fitness. To plot the evolution:
+
+```python
+import pandas as pd
+import matplotlib.pyplot as plt
+
+runs = pd.read_csv("data/training_20261116_011205.csv")
+runs.plot(x="generation", y=["champion_fitness", "mean_fitness", "worst_fitness"])
+plt.show()
+```
+
+**What to expect.** With busy roads (`car_spawn_probability` 0.5 on both) the crossing is saturated: only one
+road can pass cars at a time, so the cars passed in a game can't be much more than its number of ticks, and
+even a simple setting (threshold 0, every coefficient 1) gets close to that. Training mostly learns to use a
+threshold near 0 and to switch toward the busier road, and gains a few percent over hand-picked values.
+The linear combination agent also never crashes (it always shows exactly one green light, and a car that has
+passed its light is out of the crossing on the next tick), so `crash_penalty` has no effect on it today. A
+fitness that also charged for waiting time or queue length would give training more to optimize.
 
 ### Coordinates
 

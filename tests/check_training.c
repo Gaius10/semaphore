@@ -109,11 +109,19 @@ static void make_config(const char* output_dir, unsigned int seed, unsigned int 
     ck_assert_int_eq(config_create(config_path, &config), CONFIG_STATUS_OK);
 }
 
-/** Runs the mode with stdout redirected to a file (each test runs in its own process, so it is not restored). */
+/** Runs the mode with stdout redirected to a file, and puts stdout back afterwards (CK_FORK=no runs every test in one process). */
 static int run_mode(void) {
-    ck_assert_ptr_nonnull(freopen(output_path, "w", stdout));
-    int code = mode_run_training(config);
     fflush(stdout);
+    int saved = dup(STDOUT_FILENO);
+    ck_assert_int_ge(saved, 0);
+    ck_assert_ptr_nonnull(freopen(output_path, "w", stdout));
+
+    int code = mode_run_training(config);
+
+    fflush(stdout);
+    dup2(saved, STDOUT_FILENO);
+    close(saved);
+    clearerr(stdout);
     return code;
 }
 
