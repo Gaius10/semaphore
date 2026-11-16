@@ -1,14 +1,19 @@
-#define _POSIX_C_SOURCE 200809L /* mkdir and clock_gettime are hidden under strict -std=c2x */
+#define _POSIX_C_SOURCE 200809L /* mkdir, sigaction and clock_gettime are hidden under strict -std=c2x */
 
 #include "training.h"
 
 #include <errno.h>
+#include <stdbool.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "../training/candidate.h"
+#include "../training/dashboard.h"
 #include "../training/evaluator.h"
 #include "../training/genetic.h"
 #include "../training/results_csv.h"
@@ -17,10 +22,25 @@
 typedef struct run {
     evaluator_t* evaluator;
     results_csv_t* csv;
-    unsigned int generations;
-    struct timespec start;
+    dashboard_t* dashboard;
+
+    /* The best champion so far: the first one with the highest fitness. */
+    bool has_best;
+    double best_fitness;
+    unsigned int best_generation;
+    double* best_genome;
+    unsigned int genome_length;
+
+    unsigned int generations_done;
 } run_t;
 
+/**
+ * Ctrl-C asks for a clean stop: the generation in progress finishes, its row is written, and the run
+ * ends with the best genome so far. A second Ctrl-C quits at once.
+ */
+static volatile sig_atomic_t interrupts = 0;
+
+static void on_interrupt(int signal_number);
 static int run_training(
     const config_t* config,
     const config_training_t* training,
@@ -36,7 +56,15 @@ static int evaluate(
     double* fitness_out,
     void* context
 );
+static void show_progress(const evaluator_progress_t* progress, void* context);
 static int report(const genetic_generation_t* generation, void* context);
+static void print_summary(
+    const run_t* run,
+    config_human_player_t world,
+    double elapsed,
+    bool interrupted,
+    const char* csv_path
+);
 static const char* describe_failure(genetic_status_t status);
 static double seconds_since(const struct timespec* start);
 static void print_genes(const char* name, const double* genes, unsigned int count);
@@ -92,24 +120,43 @@ static int run_training(
 
     double* min = malloc(length * sizeof(double));
     double* max = malloc(length * sizeof(double));
-    double* best = malloc(length * sizeof(double));
-    if (min == NULL || max == NULL || best == NULL) {
+    run_t run = { .csv = csv, .genome_length = length };
+    run.best_genome = malloc(length * sizeof(double));
+    if (min == NULL || max == NULL || run.best_genome == NULL) {
         printf("Error starting training: out of memory.\n");
         free(min);
         free(max);
-        free(best);
+        free(run.best_genome);
         return 1;
     }
     candidate_genome_ranges(config, min, max);
 
-    run_t run = { .evaluator = NULL, .csv = csv, .generations = training->generations };
+    int exit_code = 1;
     if (evaluator_create(config, training->population_size, &run.evaluator) != EVALUATOR_STATUS_OK) {
         printf("Error starting training: out of memory.\n");
-        free(min);
-        free(max);
-        free(best);
-        return 1;
+        goto cleanup;
     }
+
+    dashboard_info_t info = {
+        .population_size = training->population_size,
+        .generations = training->generations,
+        .episodes_per_candidate = training->episodes_per_candidate,
+        .episode_ticks = training->episode_ticks,
+        .workers = training->workers,
+        .seed = training->seed,
+        .length_h = world.road_length_h,
+        .length_v = world.road_length_v,
+        .coeficient_max = training->coeficient_max,
+        .threshold_max = training->threshold_max,
+        .csv_path = csv_path,
+    };
+    unsigned int width = 0;
+    dashboard_style_t style = dashboard_detect_style(stdout, training->workers, &width);
+    if (!dashboard_create(stdout, style, width, &info, &run.dashboard)) {
+        printf("Error starting training: out of memory.\n");
+        goto cleanup;
+    }
+    evaluator_set_progress(run.evaluator, show_progress, &run);
 
     genetic_params_t params = {
         .population_size = training->population_size,
@@ -122,45 +169,35 @@ static int run_training(
         .seed = training->seed,
     };
     genetic_result_t result;
+    struct timespec start;
+    clock_gettime(CLOCK_MONOTONIC, &start);
 
-    printf(
-        "Training: %u candidates x %u generations, %u episodes of %u ticks each, seed %u, %u worker%s.\n",
-        training->population_size,
-        training->generations,
-        training->episodes_per_candidate,
-        training->episode_ticks,
-        training->seed,
-        training->workers,
-        training->workers == 1 ? "" : "s"
-    );
-    printf("Results: %s\n\n", csv_path);
-    fflush(stdout);
+    struct sigaction handler = { .sa_handler = on_interrupt };
+    struct sigaction previous;
+    sigemptyset(&handler.sa_mask);
+    interrupts = 0;
+    sigaction(SIGINT, &handler, &previous);
 
-    clock_gettime(CLOCK_MONOTONIC, &run.start);
-    genetic_status_t status = genetic_run(&params, min, max, evaluate, report, &run, &result, best);
-    double elapsed = seconds_since(&run.start);
+    genetic_status_t status = genetic_run(&params, min, max, evaluate, report, &run, &result, NULL);
 
-    int exit_code = 0;
-    if (status == GENETIC_STATUS_OK) {
-        printf("\nDone: %u generations in %.1fs.\n", training->generations, elapsed);
-        printf(
-            "Best genome seen (fitness %.2f, found in generation %u). For the [ai_player] section of config.ini:\n\n",
-            result.best_fitness,
-            result.best_generation
-        );
-        printf("agent=linear_combination\nbinarization_method=threshold\nthreshold=%.10g\n", best[0]);
-        print_genes("coeficients_h", &best[1], world.road_length_h);
-        print_genes("coeficients_v", &best[1 + world.road_length_h], world.road_length_v);
-        printf("\nThe champion of every generation is in %s\n", csv_path);
+    sigaction(SIGINT, &previous, NULL);
+    double elapsed = seconds_since(&start);
+    bool interrupted = interrupts > 0 && status == GENETIC_STATUS_EREPORT;
+    dashboard_finish(run.dashboard, status == GENETIC_STATUS_OK);
+
+    if (status == GENETIC_STATUS_OK || interrupted) {
+        print_summary(&run, world, elapsed, interrupted, csv_path);
+        exit_code = 0;
     } else {
         printf("\nTraining stopped by an error: %s.\n", describe_failure(status));
-        exit_code = 1;
     }
 
+cleanup:
+    dashboard_destroy(&run.dashboard);
     evaluator_destroy(&run.evaluator);
     free(min);
     free(max);
-    free(best);
+    free(run.best_genome);
     return exit_code;
 }
 
@@ -187,7 +224,14 @@ static int evaluate(
     return evaluator_evaluate(genomes, count, genome_length, generation, fitness_out, run->evaluator);
 }
 
-/** One CSV row and one line of text per generation. */
+/** The panel follows the workers while a generation is played. */
+static void show_progress(const evaluator_progress_t* progress, void* context) {
+    run_t* run = context;
+
+    dashboard_update_progress(run->dashboard, progress);
+}
+
+/** One CSV row and one dashboard update per generation; a Ctrl-C makes this the last one. */
 static int report(const genetic_generation_t* generation, void* context) {
     run_t* run = context;
     const candidate_result_t* champion = evaluator_result(run->evaluator, generation->best_index);
@@ -208,20 +252,63 @@ static int report(const genetic_generation_t* generation, void* context) {
         return 1;
     }
 
-    printf(
-        "generation %*u/%u  champion %8.2f  mean %8.2f  worst %8.2f  (cars %.1f, crashes %.2f)  %6.1fs\n",
-        (int)snprintf(NULL, 0, "%u", run->generations),
-        generation->index + 1,
-        run->generations,
-        generation->best_fitness,
-        generation->mean_fitness,
-        generation->worst_fitness,
-        champion->cars_passed,
-        champion->crashes,
-        seconds_since(&run->start)
-    );
-    fflush(stdout);
-    return 0;
+    dashboard_generation_t shown = {
+        .index = generation->index,
+        .champion_fitness = generation->best_fitness,
+        .mean_fitness = generation->mean_fitness,
+        .worst_fitness = generation->worst_fitness,
+        .champion_cars_passed = champion->cars_passed,
+        .champion_crashes = champion->crashes,
+        .champion_genome = generation->best_genome,
+    };
+    dashboard_add_generation(run->dashboard, &shown);
+
+    if (!run->has_best || generation->best_fitness > run->best_fitness) {
+        run->has_best = true;
+        run->best_fitness = generation->best_fitness;
+        run->best_generation = generation->index;
+        memcpy(run->best_genome, generation->best_genome, run->genome_length * sizeof(double));
+    }
+    run->generations_done++;
+
+    return interrupts > 0 ? 1 : 0;
+}
+
+static void on_interrupt(int signal_number) {
+    (void)signal_number;
+
+    if (interrupts++ > 0) {
+        dashboard_emergency_restore();
+        _exit(130);
+    }
+}
+
+static void print_summary(
+    const run_t* run,
+    config_human_player_t world,
+    double elapsed,
+    bool interrupted,
+    const char* csv_path
+) {
+    if (interrupted) {
+        printf("\nInterrupted after %u generation%s (%.1fs).\n", run->generations_done, run->generations_done == 1 ? "" : "s", elapsed);
+    } else {
+        printf("\nDone: %u generations in %.1fs.\n", run->generations_done, elapsed);
+    }
+
+    if (run->has_best) {
+        printf(
+            "Best genome seen (fitness %.2f, found in generation %u). For the [ai_player] section of config.ini:\n\n",
+            run->best_fitness,
+            run->best_generation + 1
+        );
+        printf("agent=linear_combination\nbinarization_method=threshold\nthreshold=%.10g\n", run->best_genome[0]);
+        print_genes("coeficients_h", &run->best_genome[1], world.road_length_h);
+        print_genes("coeficients_v", &run->best_genome[1 + world.road_length_h], world.road_length_v);
+        printf("\n");
+    }
+
+    printf("The champion of every generation is in %s\n", csv_path);
 }
 
 static const char* describe_failure(genetic_status_t status) {

@@ -19,6 +19,7 @@ int main(void) {
     srunner_add_suite(runner, genetic_suite());
     srunner_add_suite(runner, evaluator_suite());
     srunner_add_suite(runner, training_suite());
+    srunner_add_suite(runner, dashboard_suite());
 
     /* Set CK_FORK=no in the environment to run in-process (e.g. under valgrind/gdb). */
     srunner_run_all(runner, CK_NORMAL);

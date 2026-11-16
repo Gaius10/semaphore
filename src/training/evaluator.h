@@ -20,6 +20,9 @@
  * candidate depends only on (config, genome, generation), so it is the same for any number of workers.
  * Even a single worker is a separate process, so there is only one code path.
  *
+ * Workers ignore SIGINT (a Ctrl-C reaches the whole process group, and the caller, not the workers,
+ * decides how to stop) and, on Linux, are killed if the process that started them dies.
+ *
  * The evaluator also keeps the full result of every candidate of the last population it scored, so
  * that the caller can read the cars passed and the crashes of, say, the champion.
  */

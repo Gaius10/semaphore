@@ -8,6 +8,9 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -37,6 +40,7 @@ struct evaluator {
     unsigned int* assigned;
     unsigned int* finished_copy;
     pid_t* pids;
+    pid_t parent; /* the process that forks the workers */
 };
 
 /** The work of one worker: plays its candidates and exits. Never returns. */
@@ -144,6 +148,7 @@ int evaluator_evaluate(
     }
 
     self->scored = 0;
+    self->parent = getpid();
     unsigned int started = count < self->workers ? count : self->workers; /* no worker without candidates */
     for (unsigned int w = 0; w < self->workers; w++) {
         atomic_store(&self->finished[w], 0);
@@ -199,6 +204,19 @@ static void worker_main(
     unsigned int generation
 ) {
     unsigned int started = count < self->workers ? count : self->workers;
+
+    /*
+     * Ctrl-C goes to the whole process group, workers included. The caller decides how to stop (the
+     * training waits for the generation to finish), so a worker ignores it...
+     */
+    signal(SIGINT, SIG_IGN);
+#ifdef __linux__
+    /* ...but a worker must not outlive the process that is waiting for it. */
+    prctl(PR_SET_PDEATHSIG, SIGKILL);
+    if (getppid() != self->parent) {
+        _exit(1); /* the parent was already gone before the line above took effect */
+    }
+#endif
 
     for (unsigned int i = worker; i < count; i += started) {
         const double* genome = &genomes[(size_t)i * self->genome_length];

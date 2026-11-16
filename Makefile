@@ -23,6 +23,7 @@ OBJS := \
 	build/candidate.o \
 	build/evaluator.o \
 	build/results_csv.o \
+	build/dashboard.o \
 	build/training.o \
 	build/road.o \
 	build/car.o \
@@ -49,7 +50,8 @@ LIBS := \
 	src/training/genetic.h \
 	src/training/candidate.h \
 	src/training/evaluator.h \
-	src/training/results_csv.h
+	src/training/results_csv.h \
+	src/training/dashboard.h
 
 .PHONY: all clean run test
 
@@ -117,6 +119,9 @@ build/candidate.o: src/training/candidate.c $(LIBS)
 build/evaluator.o: src/training/evaluator.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/evaluator.c -o build/evaluator.o
 
+build/dashboard.o: src/training/dashboard.c $(LIBS)
+	$(CC) $(CFLAGS) -c src/training/dashboard.c -o build/dashboard.o
+
 build/results_csv.o: src/training/results_csv.c $(LIBS)
 	$(CC) $(CFLAGS) -c src/training/results_csv.c -o build/results_csv.o
 
@@ -147,6 +152,7 @@ TEST_SRC_OBJS := \
 	build/candidate.o \
 	build/evaluator.o \
 	build/results_csv.o \
+	build/dashboard.o \
 	build/training.o \
 	build/road.o \
 	build/car.o \
@@ -168,6 +174,7 @@ TEST_OBJS := \
 	build/tests/check_genetic.o \
 	build/tests/check_evaluator.o \
 	build/tests/check_training.o \
+	build/tests/check_dashboard.o \
 	build/tests/check_traffic_light.o
 
 test: $(TEST_TARGET)

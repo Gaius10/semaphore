@@ -540,6 +540,17 @@ static candidate_status_t play_slowly_unless_poisoned(
     return candidate_play(config_in, genome, generation, result);
 }
 
+/** Gets a Ctrl-C while playing, the way the workers do when the user presses it in the terminal. */
+static candidate_status_t play_while_interrupted(
+    const config_t* config_in,
+    const double* genome,
+    unsigned int generation,
+    candidate_result_t* result
+) {
+    kill(getpid(), SIGINT);
+    return candidate_play(config_in, genome, generation, result);
+}
+
 /** A short pause per candidate, so that the progress callback has something to watch. */
 static candidate_status_t play_with_a_pause(
     const config_t* config_in,
@@ -760,6 +771,20 @@ START_TEST(test_parallel_the_work_is_split_between_the_workers_and_all_of_it_is_
 }
 END_TEST
 
+START_TEST(test_parallel_workers_ignore_ctrl_c) {
+    /* The caller decides how to stop: a SIGINT that reaches the workers must not kill them. */
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 28);
+    evaluator_t* evaluator = create_with_workers(3, play_while_interrupted);
+
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    ck_assert_ptr_nonnull(evaluator_result(evaluator, POPULATION - 1));
+    assert_no_children_left();
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
 START_TEST(test_parallel_create_with_rejects_bad_arguments) {
     evaluator_t* evaluator = NULL;
 
@@ -803,6 +828,7 @@ Suite* evaluator_suite(void) {
     tcase_add_test(tc, test_parallel_a_failure_stops_the_other_workers_without_waiting_for_them);
     tcase_add_test(tc, test_parallel_progress_goes_from_nothing_done_to_everything_done);
     tcase_add_test(tc, test_parallel_the_work_is_split_between_the_workers_and_all_of_it_is_done);
+    tcase_add_test(tc, test_parallel_workers_ignore_ctrl_c);
     tcase_add_test(tc, test_parallel_create_with_rejects_bad_arguments);
 
     suite_add_tcase(s, tc);

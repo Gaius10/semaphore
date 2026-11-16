@@ -18,5 +18,6 @@ Suite* rng_suite(void);
 Suite* genetic_suite(void);
 Suite* evaluator_suite(void);
 Suite* training_suite(void);
+Suite* dashboard_suite(void);
 
 #endif

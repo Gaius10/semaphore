@@ -3,6 +3,7 @@
 #include <check.h>
 #include <dirent.h>
 #include <math.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,6 +36,7 @@ static char dir[64];
 static char config_path[128];
 static char output_path[128]; /* where stdout goes while the mode runs */
 static config_t* config;
+static unsigned int generations_to_run;
 
 static void setup(void) {
     snprintf(dir, sizeof(dir), "/tmp/semaphore_training_XXXXXX");
@@ -42,6 +44,7 @@ static void setup(void) {
     snprintf(config_path, sizeof(config_path), "%s/config.ini", dir);
     snprintf(output_path, sizeof(output_path), "%s/stdout.txt", dir);
     config = NULL;
+    generations_to_run = GENERATIONS;
 }
 
 /** Removes every file of the temp folder (and the folders `training_output_dir` makes in it), then the folder. */
@@ -85,7 +88,7 @@ static void make_config(const char* output_dir, unsigned int seed, unsigned int 
         "road_length_h=%d\n"
         "road_length_v=%d\n"
         "population_size=%d\n"
-        "generations=%d\n"
+        "generations=%u\n"
         "episodes_per_candidate=2\n"
         "episode_ticks=80\n"
         "crash_penalty=5\n"
@@ -98,7 +101,7 @@ static void make_config(const char* output_dir, unsigned int seed, unsigned int 
         "seed=%u\n"
         "workers=%u\n"
         "training_output_dir=%s\n",
-        WORLD_H, WORLD_V, POPULATION, GENERATIONS, COEFICIENT_MAX, THRESHOLD_MAX, seed, workers, output_dir
+        WORLD_H, WORLD_V, POPULATION, generations_to_run, COEFICIENT_MAX, THRESHOLD_MAX, seed, workers, output_dir
     );
     fclose(f);
 
@@ -320,6 +323,62 @@ START_TEST(test_training_the_number_of_workers_does_not_change_the_results) {
 }
 END_TEST
 
+START_TEST(test_training_ctrl_c_stops_cleanly_with_the_results_so_far) {
+    generations_to_run = 100000; /* far more than it can do before the Ctrl-C */
+    make_config(dir, 15, 2);
+
+    pid_t pid = fork();
+    ck_assert_int_ge(pid, 0);
+    if (pid == 0) {
+        _exit(run_mode());
+    }
+
+    /* Wait until a few generations are done, then press Ctrl-C. */
+    bool started = false;
+    for (int attempt = 0; attempt < 2000 && !started; attempt++) {
+        FILE* f = fopen(output_path, "r");
+        if (f != NULL) {
+            char text[4096] = { 0 };
+            size_t got = fread(text, 1, sizeof(text) - 1, f);
+            (void)got;
+            fclose(f);
+            started = strstr(text, "     3/100000") != NULL; /* "generation      3/100000": padded to 6 digits */
+        }
+        if (!started) {
+            nanosleep(&(struct timespec) { .tv_sec = 0, .tv_nsec = 10000000L }, NULL);
+        }
+    }
+    ck_assert(started);
+    ck_assert_int_eq(kill(pid, SIGINT), 0);
+
+    int status = 0;
+    ck_assert_int_eq(waitpid(pid, &status, 0), pid);
+    ck_assert_msg(WIFEXITED(status) && WEXITSTATUS(status) == 0, "exit status %d", status);
+
+    char* out = read_file(output_path);
+    ck_assert_ptr_nonnull(strstr(out, "Interrupted after"));
+    ck_assert_ptr_nonnull(strstr(out, "threshold="));
+    ck_assert_ptr_nonnull(strstr(out, "coeficients_h="));
+    free(out);
+
+    /* Every row that was written is whole, and the Ctrl-C did not lose any generation that finished. */
+    char csv[256];
+    find_csv(dir, csv, sizeof(csv));
+    char* text = read_file(csv);
+    char* line = strtok(text, "\n"); /* header */
+    int rows = 0;
+    while ((line = strtok(NULL, "\n")) != NULL) {
+        double cells[COLUMNS];
+        ck_assert_int_eq(parse_row(line, cells, COLUMNS), COLUMNS);
+        ck_assert_double_eq(cells[0], rows);
+        rows++;
+    }
+    ck_assert_int_ge(rows, 3);
+    ck_assert_int_lt(rows, 100000);
+    free(text);
+}
+END_TEST
+
 START_TEST(test_training_prints_progress_and_the_best_genome_to_paste) {
     make_config(dir, 7, 1);
     ck_assert_int_eq(run_mode(), 0);
@@ -481,6 +540,7 @@ Suite* training_suite(void) {
     tcase_add_test(tc, test_training_every_row_can_be_rescored_from_its_own_genome);
     tcase_add_test(tc, test_training_same_seed_gives_the_same_results_and_a_different_seed_does_not);
     tcase_add_test(tc, test_training_the_number_of_workers_does_not_change_the_results);
+    tcase_add_test(tc, test_training_ctrl_c_stops_cleanly_with_the_results_so_far);
     tcase_add_test(tc, test_training_prints_progress_and_the_best_genome_to_paste);
     tcase_add_test(tc, test_training_creates_the_output_folder);
     tcase_add_test(tc, test_training_fails_when_the_output_folder_cannot_be_made);
