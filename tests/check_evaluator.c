@@ -1,11 +1,15 @@
 #define _POSIX_C_SOURCE 200809L /* mkstemp is hidden under strict -std=c2x */
 
 #include <check.h>
+#include <errno.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../src/agents/ai.h"
@@ -473,6 +477,300 @@ START_TEST(test_evaluator_drives_a_genetic_run) {
 }
 END_TEST
 
+/* ------------------------------------------------------ parallel workers */
+
+/** No child process of this test is left, running or as a zombie. */
+static void assert_no_children_left(void) {
+    errno = 0;
+    ck_assert_int_eq(waitpid(-1, NULL, WNOHANG), -1);
+    ck_assert_int_eq(errno, ECHILD);
+}
+
+static evaluator_t* create_with_workers(unsigned int workers, evaluator_play_fn play) {
+    evaluator_t* evaluator = NULL;
+    ck_assert_int_eq(evaluator_create_with(config, POPULATION, workers, play, &evaluator), EVALUATOR_STATUS_OK);
+    return evaluator;
+}
+
+/** A genome with a negative threshold is "poisoned": the play functions below misbehave on it. */
+static bool is_poisoned(const double* genome) {
+    return genome[0] < 0;
+}
+
+static candidate_status_t play_failing_on_poison(
+    const config_t* config_in,
+    const double* genome,
+    unsigned int generation,
+    candidate_result_t* result
+) {
+    if (is_poisoned(genome)) {
+        return CANDIDATE_STATUS_EPLAY;
+    }
+
+    return candidate_play(config_in, genome, generation, result);
+}
+
+/** Dies the way a crashing worker would: killed by a signal, with nothing returned. */
+static candidate_status_t play_dying_on_poison(
+    const config_t* config_in,
+    const double* genome,
+    unsigned int generation,
+    candidate_result_t* result
+) {
+    if (is_poisoned(genome)) {
+        kill(getpid(), SIGKILL);
+    }
+
+    return candidate_play(config_in, genome, generation, result);
+}
+
+/** Fails at once on poison and takes 3 seconds on everything else. */
+static candidate_status_t play_slowly_unless_poisoned(
+    const config_t* config_in,
+    const double* genome,
+    unsigned int generation,
+    candidate_result_t* result
+) {
+    if (is_poisoned(genome)) {
+        return CANDIDATE_STATUS_EPLAY;
+    }
+
+    struct timespec three_seconds = { .tv_sec = 3, .tv_nsec = 0 };
+    nanosleep(&three_seconds, NULL);
+    return candidate_play(config_in, genome, generation, result);
+}
+
+/** A short pause per candidate, so that the progress callback has something to watch. */
+static candidate_status_t play_with_a_pause(
+    const config_t* config_in,
+    const double* genome,
+    unsigned int generation,
+    candidate_result_t* result
+) {
+    struct timespec pause = { .tv_sec = 0, .tv_nsec = 30000000L };
+    nanosleep(&pause, NULL);
+    return candidate_play(config_in, genome, generation, result);
+}
+
+START_TEST(test_parallel_results_are_the_same_for_any_number_of_workers) {
+    double genomes[POPULATION * GENOME_LENGTH];
+    random_population(genomes, POPULATION, 20);
+
+    double expected[POPULATION];
+    for (unsigned int i = 0; i < POPULATION; i++) {
+        expected[i] = play(&genomes[i * GENOME_LENGTH], 3).fitness; /* serial, in this process */
+    }
+
+    unsigned int worker_counts[] = { 1, 2, 3, 8 };
+    for (unsigned int k = 0; k < sizeof(worker_counts) / sizeof(worker_counts[0]); k++) {
+        double fitness[POPULATION];
+        evaluator_t* evaluator = create_with_workers(worker_counts[k], candidate_play);
+
+        ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 3, fitness, evaluator), 0);
+        for (unsigned int i = 0; i < POPULATION; i++) {
+            ck_assert_msg(fitness[i] == expected[i], "%u workers, candidate %u", worker_counts[k], i);
+            ck_assert_double_eq(evaluator_result(evaluator, i)->fitness, expected[i]);
+        }
+
+        evaluator_destroy(&evaluator);
+        assert_no_children_left();
+    }
+}
+END_TEST
+
+START_TEST(test_parallel_more_workers_than_candidates_and_an_empty_population) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 21);
+    evaluator_t* evaluator = create_with_workers(8, candidate_play);
+
+    ck_assert_int_eq(evaluator_evaluate(genomes, 3, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    for (unsigned int i = 0; i < 3; i++) {
+        ck_assert_double_eq(fitness[i], play(&genomes[i * GENOME_LENGTH], 0).fitness);
+    }
+    ck_assert_ptr_null(evaluator_result(evaluator, 3));
+
+    ck_assert_int_eq(evaluator_evaluate(genomes, 0, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    ck_assert_ptr_null(evaluator_result(evaluator, 0));
+
+    evaluator_destroy(&evaluator);
+    assert_no_children_left();
+}
+END_TEST
+
+START_TEST(test_parallel_workers_do_not_touch_the_rand_state_of_the_caller) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 22);
+    evaluator_t* evaluator = create_with_workers(3, candidate_play);
+
+    srand(123);
+    int expected = rand();
+
+    srand(123);
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    ck_assert_int_eq(rand(), expected);
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
+START_TEST(test_parallel_a_worker_that_fails_fails_the_run_and_leaves_no_zombie) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 23);
+    genomes[4 * GENOME_LENGTH] = -1.0; /* poison candidate 4 */
+
+    evaluator_t* evaluator = create_with_workers(3, play_failing_on_poison);
+    ck_assert_int_ne(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    ck_assert_ptr_null(evaluator_result(evaluator, 0)); /* no results from a failed run */
+    assert_no_children_left();
+
+    /* The evaluator is still good: a clean population works afterwards. */
+    genomes[4 * GENOME_LENGTH] = 0.5;
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    ck_assert_ptr_nonnull(evaluator_result(evaluator, POPULATION - 1));
+
+    evaluator_destroy(&evaluator);
+    assert_no_children_left();
+}
+END_TEST
+
+START_TEST(test_parallel_a_worker_killed_by_a_signal_fails_the_run) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 24);
+    genomes[1 * GENOME_LENGTH] = -1.0;
+
+    evaluator_t* evaluator = create_with_workers(2, play_dying_on_poison);
+    ck_assert_int_ne(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    assert_no_children_left();
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
+START_TEST(test_parallel_a_failure_stops_the_other_workers_without_waiting_for_them) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 25);
+    genomes[0] = -1.0; /* candidate 0 fails at once; every other one would take 3 seconds */
+
+    evaluator_t* evaluator = create_with_workers(POPULATION, play_slowly_unless_poisoned);
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+    ck_assert_int_ne(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    double seconds = (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) / 1e9;
+    ck_assert_double_lt(seconds, 1.5);
+    assert_no_children_left();
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
+typedef struct progress_log {
+    unsigned int calls;
+    unsigned int first_done;
+    unsigned int last_done;
+    unsigned int last_total;
+    unsigned int last_generation;
+    bool never_goes_back;
+    bool per_worker_within_share;
+    bool workers_add_up;
+    unsigned int workers;
+    unsigned int last_assigned[8];
+    unsigned int last_finished[8];
+} progress_log_t;
+
+static void log_progress(const evaluator_progress_t* progress, void* context) {
+    progress_log_t* log = context;
+
+    if (log->calls == 0) {
+        log->first_done = progress->done;
+    } else if (progress->done < log->last_done) {
+        log->never_goes_back = false;
+    }
+
+    unsigned int sum = 0;
+    for (unsigned int w = 0; w < progress->workers; w++) {
+        if (progress->finished[w] > progress->assigned[w]) {
+            log->per_worker_within_share = false;
+        }
+        sum += progress->finished[w];
+    }
+    if (sum != progress->done) {
+        log->workers_add_up = false;
+    }
+
+    log->workers = progress->workers;
+    for (unsigned int w = 0; w < progress->workers && w < 8; w++) {
+        log->last_assigned[w] = progress->assigned[w];
+        log->last_finished[w] = progress->finished[w];
+    }
+
+    log->calls++;
+    log->last_done = progress->done;
+    log->last_total = progress->total;
+    log->last_generation = progress->generation;
+}
+
+START_TEST(test_parallel_progress_goes_from_nothing_done_to_everything_done) {
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 26);
+    evaluator_t* evaluator = create_with_workers(2, play_with_a_pause);
+
+    progress_log_t log = { .never_goes_back = true, .per_worker_within_share = true, .workers_add_up = true };
+    evaluator_set_progress(evaluator, log_progress, &log);
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 7, fitness, evaluator), 0);
+
+    ck_assert_uint_ge(log.calls, 2);
+    ck_assert_uint_eq(log.first_done, 0);
+    ck_assert_uint_eq(log.last_done, POPULATION);
+    ck_assert_uint_eq(log.last_total, POPULATION);
+    ck_assert_uint_eq(log.last_generation, 7);
+    ck_assert(log.never_goes_back);
+    ck_assert(log.per_worker_within_share);
+    ck_assert(log.workers_add_up);
+
+    /* Cleared: no more calls. */
+    unsigned int calls = log.calls;
+    evaluator_set_progress(evaluator, NULL, NULL);
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 7, fitness, evaluator), 0);
+    ck_assert_uint_eq(log.calls, calls);
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
+START_TEST(test_parallel_the_work_is_split_between_the_workers_and_all_of_it_is_done) {
+    /* 6 candidates for 4 workers: shares of 2, 2, 1, 1. */
+    double genomes[POPULATION * GENOME_LENGTH], fitness[POPULATION];
+    random_population(genomes, POPULATION, 27);
+    evaluator_t* evaluator = create_with_workers(4, play_with_a_pause);
+
+    progress_log_t log = { .never_goes_back = true, .per_worker_within_share = true, .workers_add_up = true };
+    evaluator_set_progress(evaluator, log_progress, &log);
+    ck_assert_int_eq(evaluator_evaluate(genomes, POPULATION, GENOME_LENGTH, 0, fitness, evaluator), 0);
+
+    unsigned int expected_shares[4] = { 2, 2, 1, 1 };
+    ck_assert_uint_eq(log.workers, 4);
+    for (unsigned int w = 0; w < 4; w++) {
+        ck_assert_uint_eq(log.last_assigned[w], expected_shares[w]);
+        ck_assert_uint_eq(log.last_finished[w], expected_shares[w]);
+    }
+
+    evaluator_destroy(&evaluator);
+}
+END_TEST
+
+START_TEST(test_parallel_create_with_rejects_bad_arguments) {
+    evaluator_t* evaluator = NULL;
+
+    ck_assert_int_eq(evaluator_create_with(config, POPULATION, 0, candidate_play, &evaluator), EVALUATOR_STATUS_EINVAL);
+    ck_assert_int_eq(evaluator_create_with(config, POPULATION, 2, NULL, &evaluator), EVALUATOR_STATUS_EINVAL);
+    ck_assert_int_eq(evaluator_create_with(NULL, POPULATION, 2, candidate_play, &evaluator), EVALUATOR_STATUS_EINVAL);
+    ck_assert_int_eq(evaluator_create_with(config, 0, 2, candidate_play, &evaluator), EVALUATOR_STATUS_EINVAL);
+    ck_assert_ptr_null(evaluator);
+}
+END_TEST
+
 Suite* evaluator_suite(void) {
     Suite* s = suite_create("evaluator");
     TCase* tc = tcase_create("core");
@@ -496,6 +794,16 @@ Suite* evaluator_suite(void) {
     tcase_add_test(tc, test_evaluator_rejects_a_shape_that_does_not_fit);
     tcase_add_test(tc, test_evaluator_create_and_destroy_edge_cases);
     tcase_add_test(tc, test_evaluator_drives_a_genetic_run);
+
+    tcase_add_test(tc, test_parallel_results_are_the_same_for_any_number_of_workers);
+    tcase_add_test(tc, test_parallel_more_workers_than_candidates_and_an_empty_population);
+    tcase_add_test(tc, test_parallel_workers_do_not_touch_the_rand_state_of_the_caller);
+    tcase_add_test(tc, test_parallel_a_worker_that_fails_fails_the_run_and_leaves_no_zombie);
+    tcase_add_test(tc, test_parallel_a_worker_killed_by_a_signal_fails_the_run);
+    tcase_add_test(tc, test_parallel_a_failure_stops_the_other_workers_without_waiting_for_them);
+    tcase_add_test(tc, test_parallel_progress_goes_from_nothing_done_to_everything_done);
+    tcase_add_test(tc, test_parallel_the_work_is_split_between_the_workers_and_all_of_it_is_done);
+    tcase_add_test(tc, test_parallel_create_with_rejects_bad_arguments);
 
     suite_add_tcase(s, tc);
     return s;

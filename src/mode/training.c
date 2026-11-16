@@ -124,12 +124,14 @@ static int run_training(
     genetic_result_t result;
 
     printf(
-        "Training: %u candidates x %u generations, %u episodes of %u ticks each, seed %u.\n",
+        "Training: %u candidates x %u generations, %u episodes of %u ticks each, seed %u, %u worker%s.\n",
         training->population_size,
         training->generations,
         training->episodes_per_candidate,
         training->episode_ticks,
-        training->seed
+        training->seed,
+        training->workers,
+        training->workers == 1 ? "" : "s"
     );
     printf("Results: %s\n\n", csv_path);
     fflush(stdout);

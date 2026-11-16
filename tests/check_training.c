@@ -74,7 +74,7 @@ static void teardown(void) {
 }
 
 /** Writes a training config whose results go to `output_dir`, and builds `config` from it. */
-static void make_config(const char* output_dir, unsigned int seed) {
+static void make_config(const char* output_dir, unsigned int seed, unsigned int workers) {
     FILE* f = fopen(config_path, "w");
     ck_assert_ptr_nonnull(f);
     fprintf(
@@ -96,9 +96,9 @@ static void make_config(const char* output_dir, unsigned int seed) {
         "coeficient_max=%g\n"
         "threshold_max=%g\n"
         "seed=%u\n"
-        "workers=1\n"
+        "workers=%u\n"
         "training_output_dir=%s\n",
-        WORLD_H, WORLD_V, POPULATION, GENERATIONS, COEFICIENT_MAX, THRESHOLD_MAX, seed, output_dir
+        WORLD_H, WORLD_V, POPULATION, GENERATIONS, COEFICIENT_MAX, THRESHOLD_MAX, seed, workers, output_dir
     );
     fclose(f);
 
@@ -166,7 +166,7 @@ static int parse_row(char* line, double* cells, int max_cells) {
 START_TEST(test_training_writes_a_header_and_one_row_per_generation) {
     char folder[128];
     snprintf(folder, sizeof(folder), "%s/out", dir);
-    make_config(folder, 5);
+    make_config(folder, 5, 1);
 
     ck_assert_int_eq(run_mode(), 0);
 
@@ -197,7 +197,7 @@ START_TEST(test_training_writes_a_header_and_one_row_per_generation) {
 END_TEST
 
 START_TEST(test_training_rows_are_consistent_with_each_other) {
-    make_config(dir, 6);
+    make_config(dir, 6, 1);
     ck_assert_int_eq(run_mode(), 0);
 
     char csv[256];
@@ -232,7 +232,7 @@ END_TEST
 
 START_TEST(test_training_every_row_can_be_rescored_from_its_own_genome) {
     /* The CSV keeps the champion in full: playing its genome again gives the fitness on the same row. */
-    make_config(dir, 12);
+    make_config(dir, 12, 1);
     ck_assert_int_eq(run_mode(), 0);
 
     char csv[256];
@@ -264,7 +264,7 @@ START_TEST(test_training_same_seed_gives_the_same_results_and_a_different_seed_d
 
     for (int run = 0; run < 3; run++) {
         snprintf(folders[run], sizeof(folders[run]), "%s/run%d", dir, run);
-        make_config(folders[run], seeds[run]);
+        make_config(folders[run], seeds[run], 1);
         /* One process per run: stdout is redirected and the output of each must go to its own file. */
         pid_t pid = fork();
         ck_assert_int_ge(pid, 0);
@@ -289,8 +289,39 @@ START_TEST(test_training_same_seed_gives_the_same_results_and_a_different_seed_d
 }
 END_TEST
 
+START_TEST(test_training_the_number_of_workers_does_not_change_the_results) {
+    unsigned int worker_counts[3] = { 1, 3, 8 };
+    char* texts[3];
+
+    for (int run = 0; run < 3; run++) {
+        char folder[128];
+        snprintf(folder, sizeof(folder), "%s/workers%d", dir, run);
+        make_config(folder, 14, worker_counts[run]);
+        pid_t pid = fork();
+        ck_assert_int_ge(pid, 0);
+        if (pid == 0) {
+            _exit(run_mode());
+        }
+        int status = 0;
+        ck_assert_int_eq(waitpid(pid, &status, 0), pid);
+        ck_assert(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+        char csv[256];
+        find_csv(folder, csv, sizeof(csv));
+        texts[run] = read_file(csv);
+    }
+
+    ck_assert_str_eq(texts[0], texts[1]);
+    ck_assert_str_eq(texts[0], texts[2]);
+
+    for (int run = 0; run < 3; run++) {
+        free(texts[run]);
+    }
+}
+END_TEST
+
 START_TEST(test_training_prints_progress_and_the_best_genome_to_paste) {
-    make_config(dir, 7);
+    make_config(dir, 7, 1);
     ck_assert_int_eq(run_mode(), 0);
 
     char* out = read_file(output_path);
@@ -322,7 +353,7 @@ END_TEST
 START_TEST(test_training_creates_the_output_folder) {
     char folder[128];
     snprintf(folder, sizeof(folder), "%s/not_there_yet", dir);
-    make_config(folder, 8);
+    make_config(folder, 8, 1);
 
     ck_assert_int_eq(run_mode(), 0);
 
@@ -335,7 +366,7 @@ END_TEST
 START_TEST(test_training_fails_when_the_output_folder_cannot_be_made) {
     char folder[160];
     snprintf(folder, sizeof(folder), "%s/missing_parent/out", dir); /* only one level is created */
-    make_config(folder, 9);
+    make_config(folder, 9, 1);
 
     ck_assert_int_ne(run_mode(), 0);
 
@@ -449,6 +480,7 @@ Suite* training_suite(void) {
     tcase_add_test(tc, test_training_rows_are_consistent_with_each_other);
     tcase_add_test(tc, test_training_every_row_can_be_rescored_from_its_own_genome);
     tcase_add_test(tc, test_training_same_seed_gives_the_same_results_and_a_different_seed_does_not);
+    tcase_add_test(tc, test_training_the_number_of_workers_does_not_change_the_results);
     tcase_add_test(tc, test_training_prints_progress_and_the_best_genome_to_paste);
     tcase_add_test(tc, test_training_creates_the_output_folder);
     tcase_add_test(tc, test_training_fails_when_the_output_folder_cannot_be_made);
